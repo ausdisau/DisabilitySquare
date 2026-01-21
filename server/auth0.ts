@@ -5,13 +5,21 @@ import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export function setupAuth0(app: Express) {
+  // Ensure issuerBaseURL has https:// prefix
+  let issuerBaseURL = process.env.AUTH0_ISSUER_BASE_URL || "";
+  if (issuerBaseURL && !issuerBaseURL.startsWith("https://") && !issuerBaseURL.startsWith("http://")) {
+    issuerBaseURL = `https://${issuerBaseURL}`;
+  }
+  // Remove trailing slash if present
+  issuerBaseURL = issuerBaseURL.replace(/\/$/, "");
+
   const config = {
     authRequired: false,
     auth0Logout: true,
     secret: process.env.AUTH0_SECRET || process.env.SESSION_SECRET,
     baseURL: process.env.AUTH0_BASE_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`,
     clientID: process.env.AUTH0_CLIENT_ID,
-    issuerBaseURL: process.env.AUTH0_ISSUER_BASE_URL,
+    issuerBaseURL,
     routes: {
       login: "/api/auth/login",
       logout: "/api/auth/logout",
@@ -21,10 +29,13 @@ export function setupAuth0(app: Express) {
 
   // Only set up Auth0 if credentials are configured
   if (config.clientID && config.issuerBaseURL) {
+    console.log(`Auth0 config: issuerBaseURL=${config.issuerBaseURL}, baseURL=${config.baseURL}`);
     app.use(auth(config));
     console.log("Auth0 authentication enabled");
   } else {
     console.log("Auth0 credentials not configured - running without authentication");
+    console.log(`  AUTH0_CLIENT_ID: ${config.clientID ? "set" : "not set"}`);
+    console.log(`  AUTH0_ISSUER_BASE_URL: ${config.issuerBaseURL ? "set" : "not set"}`);
   }
 }
 
