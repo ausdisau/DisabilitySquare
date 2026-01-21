@@ -4,34 +4,36 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --font-display: 'Architects Daughter', cursive;
-  --font-body: 'DM Sans', sans-serif;
+@layer base {
+  :root {
+    --font-display: 'Architects Daughter', cursive;
+    --font-body: 'DM Sans', sans-serif;
 
-  /* Natural, Warm Community Palette (Teal & Amber) */
-  --background: 40 33% 98%;
-  --foreground: 200 50% 10%;
-  
-  --primary: 175 60% 35%;
-  --primary-foreground: 0 0% 100%;
-  
-  --secondary: 35 60% 90%;
-  --secondary-foreground: 30 50% 20%;
-  
-  --muted: 200 10% 90%;
-  --muted-foreground: 200 10% 40%;
-  
-  --accent: 35 90% 50%;
-  --accent-foreground: 0 0% 100%;
-  
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 98%;
+    /* Natural, Warm Community Palette (Teal & Amber) */
+    --background: 40 33% 98%;
+    --foreground: 200 50% 10%;
+    
+    --primary: 175 60% 35%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 35 60% 90%;
+    --secondary-foreground: 30 50% 20%;
+    
+    --muted: 200 10% 90%;
+    --muted-foreground: 200 10% 40%;
+    
+    --accent: 35 90% 50%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
 
-  --border: 200 10% 85%;
-  --input: 200 10% 85%;
-  --ring: 175 60% 35%;
-  
-  --radius: 1rem;
+    --border: 200 10% 85%;
+    --input: 200 10% 85%;
+    --ring: 175 60% 35%;
+    
+    --radius: 1rem;
+  }
 }
 
 /* High Contrast Mode Override */
