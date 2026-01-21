@@ -1,0 +1,87 @@
+# DisabilitySquare
+
+An accessible social networking platform for people with disabilities.
+
+## Overview
+
+DisabilitySquare is a community-focused platform designed with accessibility as a core principle. It provides a safe space for people with disabilities to connect, share experiences, and engage with others through community groups, a village square feed, private messaging, and games.
+
+## Tech Stack
+
+- **Frontend**: React with Vite, TypeScript, TailwindCSS, shadcn/ui
+- **Backend**: Express.js with TypeScript
+- **Database**: PostgreSQL with Drizzle ORM
+- **Authentication**: Auth0 (express-openid-connect)
+- **Routing**: wouter (frontend), Express routes (backend)
+
+## Brand Colors
+
+- Navy Blue: #1B4B8A (primary)
+- Orange: #E07830 (accent)
+- Teal: #2A9D8F (secondary accent)
+- Cream: #F5F2ED (background)
+
+## Project Structure
+
+```
+├── client/                 # React frontend
+│   ├── src/
+│   │   ├── components/     # UI components
+│   │   ├── hooks/          # Custom React hooks
+│   │   ├── lib/            # Utilities
+│   │   ├── pages/          # Page components
+│   │   └── index.css       # Global styles
+│   └── public/
+│       └── logo.png        # DisabilitySquare logo
+├── server/                 # Express backend
+│   ├── auth0.ts            # Auth0 integration
+│   ├── routes.ts           # API routes
+│   ├── storage.ts          # Database operations
+│   └── db.ts               # Database connection
+└── shared/                 # Shared code
+    ├── schema.ts           # Drizzle schema
+    └── routes.ts           # API route definitions
+```
+
+## Authentication Setup (Auth0)
+
+This app uses Auth0 for authentication. To enable login:
+
+1. Create an Auth0 account at https://auth0.com
+2. Create a new "Regular Web Application"
+3. Configure the following in Auth0 Dashboard:
+   - **Allowed Callback URLs**: `https://your-replit-url/api/auth/callback`
+   - **Allowed Logout URLs**: `https://your-replit-url`
+   - **Allowed Web Origins**: `https://your-replit-url`
+4. Set these environment variables:
+   - `AUTH0_CLIENT_ID`: Your Auth0 Client ID
+   - `AUTH0_ISSUER_BASE_URL`: Your Auth0 domain (e.g., https://your-tenant.auth0.com)
+   - `AUTH0_SECRET`: A long random string (use `openssl rand -hex 32` to generate)
+
+## Accessibility Features
+
+- **High Contrast Mode**: Toggle for users who need increased contrast
+- **Adjustable Font Sizes**: Normal, Large, Extra Large options
+- **Keyboard Navigation**: Full support for keyboard-only navigation
+- **Skip Links**: Quick navigation to main content
+- **ARIA Labels**: Proper screen reader support
+
+## Database Schema
+
+- **users**: User accounts synced from Auth0
+- **profiles**: Extended user profile information
+- **groups**: Community groups (by diagnosis, interests, location)
+- **posts**: Village square feed posts
+- **comments**: Comments on posts
+- **gameScores**: High scores for games
+
+## Running the Project
+
+The app runs with `npm run dev` which starts both the Express backend and Vite frontend on port 5000.
+
+## Recent Changes
+
+- Integrated Auth0 authentication
+- Applied DisabilitySquare brand colors
+- Added logo to landing page and sidebar
+- Implemented accessibility controls

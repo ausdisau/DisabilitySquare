@@ -9,30 +9,85 @@
     --font-display: 'Architects Daughter', cursive;
     --font-body: 'DM Sans', sans-serif;
 
-    /* Natural, Warm Community Palette (Teal & Amber) */
-    --background: 40 33% 98%;
-    --foreground: 200 50% 10%;
+    /* DisabilitySquare Brand Palette */
+    /* Navy Blue: #1B4B8A, Orange: #E07830, Teal: #2A9D8F, Cream: #F5F2ED */
+    --background: 40 23% 95%;
+    --foreground: 213 67% 20%;
     
-    --primary: 175 60% 35%;
+    --card: 0 0% 100%;
+    --card-foreground: 213 67% 20%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 213 67% 20%;
+    
+    --primary: 213 67% 33%;
     --primary-foreground: 0 0% 100%;
     
-    --secondary: 35 60% 90%;
-    --secondary-foreground: 30 50% 20%;
+    --secondary: 40 23% 90%;
+    --secondary-foreground: 213 67% 20%;
     
-    --muted: 200 10% 90%;
-    --muted-foreground: 200 10% 40%;
+    --muted: 40 10% 90%;
+    --muted-foreground: 213 20% 40%;
     
-    --accent: 35 90% 50%;
+    --accent: 24 74% 55%;
     --accent-foreground: 0 0% 100%;
     
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 200 10% 85%;
-    --input: 200 10% 85%;
-    --ring: 175 60% 35%;
+    --border: 213 20% 85%;
+    --input: 213 20% 85%;
+    --ring: 213 67% 33%;
     
-    --radius: 1rem;
+    --radius: 0.75rem;
+    
+    --sidebar-background: 213 67% 28%;
+    --sidebar-foreground: 40 23% 95%;
+    --sidebar-primary: 24 74% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 213 67% 38%;
+    --sidebar-accent-foreground: 40 23% 95%;
+    --sidebar-border: 213 50% 40%;
+    --sidebar-ring: 24 74% 55%;
+  }
+
+  .dark {
+    --background: 213 67% 10%;
+    --foreground: 40 23% 95%;
+    
+    --card: 213 60% 15%;
+    --card-foreground: 40 23% 95%;
+    
+    --popover: 213 60% 15%;
+    --popover-foreground: 40 23% 95%;
+    
+    --primary: 170 56% 45%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 213 50% 20%;
+    --secondary-foreground: 40 23% 95%;
+    
+    --muted: 213 40% 20%;
+    --muted-foreground: 40 10% 70%;
+    
+    --accent: 24 74% 55%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 213 40% 25%;
+    --input: 213 40% 25%;
+    --ring: 170 56% 45%;
+    
+    --sidebar-background: 213 67% 8%;
+    --sidebar-foreground: 40 23% 95%;
+    --sidebar-primary: 24 74% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 213 50% 18%;
+    --sidebar-accent-foreground: 40 23% 95%;
+    --sidebar-border: 213 40% 20%;
+    --sidebar-ring: 24 74% 55%;
   }
 }
 
@@ -41,7 +96,13 @@
   --background: 0 0% 0%;
   --foreground: 0 0% 100%;
   
-  --primary: 60 100% 50%; /* Yellow */
+  --card: 0 0% 5%;
+  --card-foreground: 0 0% 100%;
+  
+  --popover: 0 0% 5%;
+  --popover-foreground: 0 0% 100%;
+  
+  --primary: 60 100% 50%;
   --primary-foreground: 0 0% 0%;
   
   --secondary: 0 0% 20%;
@@ -50,7 +111,7 @@
   --muted: 0 0% 20%;
   --muted-foreground: 0 0% 80%;
   
-  --accent: 180 100% 50%; /* Cyan */
+  --accent: 180 100% 50%;
   --accent-foreground: 0 0% 0%;
   
   --destructive: 0 100% 50%;
@@ -59,9 +120,18 @@
   --border: 0 0% 100%;
   --input: 0 0% 100%;
   --ring: 60 100% 50%;
+  
+  --sidebar-background: 0 0% 0%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-primary: 60 100% 50%;
+  --sidebar-primary-foreground: 0 0% 0%;
+  --sidebar-accent: 0 0% 15%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 0 0% 100%;
+  --sidebar-ring: 60 100% 50%;
 }
 
-/* Font Size Scaling */
+/* Font Size Scaling for Accessibility */
 .text-large {
   font-size: 110%;
 }
@@ -90,6 +160,20 @@
 
 .animate-float {
   animation: float 6s ease-in-out infinite;
+}
+
+/* Skip Link for Keyboard Navigation */
+.skip-link {
+  @apply absolute -top-10 left-4 z-50 bg-primary text-primary-foreground px-4 py-2 rounded-md;
+  transition: top 0.3s;
+}
+.skip-link:focus {
+  @apply top-4;
+}
+
+/* Focus Visible Styles for Accessibility */
+*:focus-visible {
+  @apply outline-2 outline-offset-2 outline-accent;
 }
 
 /* Custom Scrollbar for a polished look */

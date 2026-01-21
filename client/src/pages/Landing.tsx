@@ -1,7 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 
 export default function Landing() {
@@ -18,6 +17,14 @@ export default function Landing() {
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,var(--primary)/0.1,transparent_50%)]" />
         
         <div className="relative z-10 max-w-2xl">
+          <div className="flex items-center gap-4 mb-8">
+            <img 
+              src="/logo.png" 
+              alt="DisabilitySquare Logo" 
+              className="h-20 w-auto"
+            />
+          </div>
+          
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 text-accent font-bold mb-6 animate-fade-in">
             <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />
             Welcome to the Village Square
@@ -47,7 +54,7 @@ export default function Landing() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4">
-            <a href="/api/login">
+            <a href="/api/auth/login" data-testid="link-login">
               <Button size="lg" className="text-lg px-8 py-6 rounded-2xl shadow-xl shadow-primary/20 hover:shadow-2xl hover:scale-105 transition-all w-full sm:w-auto">
                 Join the Community <ArrowRight className="ml-2 h-5 w-5" />
               </Button>

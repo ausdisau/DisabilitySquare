@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-display: 'Montserrat', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+
+    /* DisabilitySquare Brand Colors */
+    --background: 40 20% 97%;
+    --foreground: 215 60% 25%;
+    
+    --primary: 215 65% 32%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 25 75% 55%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --muted: 200 15% 92%;
+    --muted-foreground: 200 10% 45%;
+    
+    --accent: 170 55% 40%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 60% 25%;
+    --card-border: 200 15% 88%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 60% 25%;
+    --popover-border: 200 15% 88%;
+
+    --sidebar: 215 65% 32%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-border: 215 55% 28%;
+    --sidebar-primary: 25 75% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 170 55% 40%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-ring: 25 75% 55%;
+
+    --border: 200 15% 88%;
+    --input: 200 15% 88%;
+    --ring: 215 65% 32%;
+    
+    --radius: 0.75rem;
+
+    --chart-1: 215 65% 32%;
+    --chart-2: 25 75% 55%;
+    --chart-3: 170 55% 40%;
+    --chart-4: 200 40% 60%;
+    --chart-5: 40 60% 70%;
+  }
+
+  .dark {
+    --background: 215 30% 12%;
+    --foreground: 40 20% 95%;
+    
+    --primary: 25 75% 55%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 215 40% 25%;
+    --secondary-foreground: 40 20% 95%;
+    
+    --muted: 215 25% 20%;
+    --muted-foreground: 200 15% 65%;
+    
+    --accent: 170 55% 45%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --card: 215 30% 15%;
+    --card-foreground: 40 20% 95%;
+    --card-border: 215 25% 22%;
+    
+    --popover: 215 30% 15%;
+    --popover-foreground: 40 20% 95%;
+    --popover-border: 215 25% 22%;
+
+    --sidebar: 215 35% 10%;
+    --sidebar-foreground: 40 20% 95%;
+    --sidebar-border: 215 30% 15%;
+    --sidebar-primary: 25 75% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 170 55% 45%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-ring: 25 75% 55%;
+
+    --border: 215 25% 22%;
+    --input: 215 25% 25%;
+    --ring: 25 75% 55%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-semibold;
+  }
+}
+
+/* High Contrast Mode */
+.high-contrast {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --primary: 60 100% 50%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 0 0% 20%;
+  --secondary-foreground: 0 0% 100%;
+  --accent: 180 100% 50%;
+  --accent-foreground: 0 0% 0%;
+  --border: 0 0% 100%;
+  --input: 0 0% 100%;
+}
+
+/* Font Size Options */
+.text-size-normal {
+  font-size: 16px;
+}
+.text-size-large {
+  font-size: 18px;
+}
+.text-size-xlarge {
+  font-size: 20px;
+}
+
+/* Focus styles for accessibility */
+:focus-visible {
+  @apply outline-2 outline-offset-2 outline-ring;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-muted;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}

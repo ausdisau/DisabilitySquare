@@ -35,9 +35,18 @@ export function Sidebar() {
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-card border-r border-border shadow-xl flex flex-col z-50 hidden md:flex">
-      <div className="p-6 border-b border-border/50">
-        <h1 className="font-display text-2xl text-primary font-bold">DisabilitySquare</h1>
-        <p className="text-sm text-muted-foreground mt-1">Our Virtual Village</p>
+      <div className="p-4 border-b border-border/50">
+        <div className="flex items-center gap-3">
+          <img 
+            src="/logo.png" 
+            alt="DisabilitySquare Logo" 
+            className="h-12 w-auto"
+          />
+          <div>
+            <h1 className="font-display text-xl text-primary font-bold">DisabilitySquare</h1>
+            <p className="text-xs text-muted-foreground">Our Virtual Village</p>
+          </div>
+        </div>
       </div>
 
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">

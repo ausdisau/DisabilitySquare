@@ -1,8 +1,7 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
+import type { Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
-import { isAuthenticated } from "./replit_integrations/auth";
+import { setupAuth0, registerAuth0Routes, isAuthenticated } from "./auth0";
 import { api } from "@shared/routes";
 import { z } from "zod";
 
@@ -10,9 +9,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Auth Setup
-  await setupAuth(app);
-  registerAuthRoutes(app);
+  // Auth0 Setup
+  setupAuth0(app);
+  registerAuth0Routes(app);
 
   // === PROFILES ===
   app.get(api.profiles.get.path, async (req, res) => {
@@ -22,20 +21,18 @@ export async function registerRoutes(
   });
 
   app.put(api.profiles.update.path, isAuthenticated, async (req: any, res) => {
-    const userId = req.user.claims.sub;
+    const userId = req.userId || req.oidc?.user?.sub;
     try {
       const input = api.profiles.update.input.parse(req.body);
-      // Check if profile exists, if not create
       let profile = await storage.getProfile(userId);
       if (!profile) {
-        // Create initial profile if it doesn't exist (using empty defaults for missing required fields if any, but profile schema mostly optional)
         profile = await storage.createProfile({ userId, ...input } as any);
       } else {
         profile = await storage.updateProfile(userId, input);
       }
       res.json(profile);
     } catch (error) {
-       if (error instanceof z.ZodError) {
+      if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
       }
       res.status(500).json({ message: "Internal server error" });
@@ -61,7 +58,7 @@ export async function registerRoutes(
       const input = api.groups.create.input.parse(req.body);
       const group = await storage.createGroup({
         ...input,
-        createdById: req.user.claims.sub,
+        createdById: req.userId || req.oidc?.user?.sub,
       });
       res.status(201).json(group);
     } catch (error) {
@@ -85,7 +82,7 @@ export async function registerRoutes(
       const input = api.posts.create.input.parse(req.body);
       const post = await storage.createPost({
         ...input,
-        authorId: req.user.claims.sub,
+        authorId: req.userId || req.oidc?.user?.sub,
       });
       res.status(201).json(post);
     } catch (error) {
@@ -108,7 +105,7 @@ export async function registerRoutes(
       const input = api.comments.create.input.parse(req.body);
       const comment = await storage.createComment({
         ...input,
-        authorId: req.user.claims.sub,
+        authorId: req.userId || req.oidc?.user?.sub,
       });
       res.status(201).json(comment);
     } catch (error) {
@@ -125,7 +122,7 @@ export async function registerRoutes(
       const input = api.games.submitScore.input.parse(req.body);
       const score = await storage.createGameScore({
         ...input,
-        userId: req.user.claims.sub,
+        userId: req.userId || req.oidc?.user?.sub,
       });
       res.status(201).json(score);
     } catch (error) {
