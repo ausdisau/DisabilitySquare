@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { LoginModal } from "@/components/LoginModal";
+import { AccessibilityPanel } from "@/components/AccessibilityPanel";
+import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 
 export default function Landing() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -90,6 +92,17 @@ export default function Landing() {
         </div>
       </div>
     </div>
+    
+    <AccessibilityPanel />
+    <KeyboardShortcuts />
+    
+    <div 
+      id="announcer" 
+      role="status" 
+      aria-live="polite" 
+      aria-atomic="true" 
+      className="sr-only"
+    />
     </>
   );
 }
