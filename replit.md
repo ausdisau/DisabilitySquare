@@ -74,6 +74,32 @@ This app uses Auth0 for authentication. To enable login:
 - **posts**: Village square feed posts
 - **comments**: Comments on posts
 - **gameScores**: High scores for games
+- **badges**: Available community badges with point thresholds
+- **user_badges**: Badges earned by users
+- **points_ledger**: Transaction log of all points awarded
+- **user_points**: Aggregate user points and levels
+
+## Valorization Points System (SRV Model)
+
+The platform uses a Social Role Valorization (SRV) model to reward genuine community interactions:
+
+### Point Values
+- **Post Created**: 10 points
+- **Comment Created**: 5 points (15 for thoughtful 100+ character comments)
+- **Reply Engagement**: 8 points to the post author when someone comments
+- **Group Created**: 20 points
+
+### Levels
+- Users gain 1 level for every 100 points earned
+
+### Badges (Auto-awarded at thresholds)
+- **Newcomer** (0 pts): Welcome to the community
+- **Connector** (50 pts): Building relationships
+- **Rising Star** (100 pts): Actively participating
+- **Advocate** (250 pts): Speaking up for others
+- **Ally** (500 pts): A true supporter
+- **Mentor** (750 pts): Guiding others
+- **Community Pillar** (1000 pts): Foundation of the community
 
 ## Running the Project
 
@@ -85,3 +111,8 @@ The app runs with `npm run dev` which starts both the Express backend and Vite f
 - Applied DisabilitySquare brand colors
 - Added logo to landing page and sidebar
 - Implemented accessibility controls
+- Implemented Valorization Points System (SRV model)
+- Added Recognition page with leaderboard and activity feed
+- Auto-badge awarding when users reach point thresholds
+- Sidebar displays user points and level
+- Profile page shows earned badges
