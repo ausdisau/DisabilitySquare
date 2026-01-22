@@ -15,10 +15,9 @@ import {
   type UserPoints, type InsertUserPoints,
   POINT_VALUES
 } from "@shared/schema";
-import { authStorage } from "./replit_integrations/auth/storage";
 
 export interface IStorage {
-  // Auth stuff (delegated or re-implemented if needed, but we use authStorage for that)
+  // User management
   getUser(id: string): Promise<User | undefined>;
   makeUserAdmin(userId: string): Promise<void>;
   
