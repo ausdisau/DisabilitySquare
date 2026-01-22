@@ -78,9 +78,9 @@ function Leaderboard({ gameName }: { gameName: string }) {
   const { data: scores, isLoading } = useGameLeaderboard(gameName);
 
   return (
-    <Card>
+    <Card data-testid={`card-leaderboard-${gameName}`}>
       <CardHeader className="bg-muted/30 pb-4">
-        <CardTitle className="capitalize flex justify-between items-center">
+        <CardTitle className="capitalize flex justify-between items-center gap-2">
           {gameName === 'tetris' ? 'Block Stacker' : gameName}
           <span className="text-sm font-normal text-muted-foreground">Top 5</span>
         </CardTitle>
@@ -93,7 +93,7 @@ function Leaderboard({ gameName }: { gameName: string }) {
         ) : (
           <div className="divide-y">
             {scores?.slice(0, 5).map((score, index) => (
-              <div key={score.id} className="p-4 flex items-center justify-between hover:bg-muted/10">
+              <div key={score.id} className="p-4 flex items-center justify-between" data-testid={`row-leaderboard-${gameName}-${index}`}>
                 <div className="flex items-center gap-4">
                   <span className={`
                     w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
@@ -103,11 +103,11 @@ function Leaderboard({ gameName }: { gameName: string }) {
                   `}>
                     #{index + 1}
                   </span>
-                  <span className="font-medium">
+                  <span className="font-medium" data-testid={`text-player-${gameName}-${index}`}>
                     {score.user.firstName} {score.user.lastName?.[0]}.
                   </span>
                 </div>
-                <span className="font-mono font-bold text-primary">{score.score} pts</span>
+                <span className="font-mono font-bold text-primary" data-testid={`text-score-${gameName}-${index}`}>{score.score} pts</span>
               </div>
             ))}
             {scores?.length === 0 && (

@@ -17,7 +17,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <h1 className="font-display text-xl text-primary font-bold">DisabilitySquare</h1>
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" data-testid="button-mobile-menu">
               <Menu className="h-6 w-6" />
             </Button>
           </SheetTrigger>

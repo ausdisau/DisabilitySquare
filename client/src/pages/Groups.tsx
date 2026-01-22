@@ -78,9 +78,9 @@ export default function Groups() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {groups?.map((group) => (
-              <Link key={group.id} href={`/groups/${group.id}`}>
+              <Link key={group.id} href={`/groups/${group.id}`} data-testid={`link-group-${group.id}`}>
                 <div className="group cursor-pointer">
-                  <Card className="h-full hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden border-2 border-transparent hover:border-primary/20">
+                  <Card className="h-full overflow-hidden border-2 border-transparent hover:border-primary/20" data-testid={`card-group-${group.id}`}>
                     <div className="h-32 bg-gradient-to-r from-primary/20 to-accent/20 flex items-center justify-center">
                       <Users className="h-12 w-12 text-primary/50" />
                     </div>

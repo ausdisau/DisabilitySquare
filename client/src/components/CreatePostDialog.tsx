@@ -37,7 +37,7 @@ export function CreatePostDialog({ groupId }: { groupId?: number }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2 shadow-lg hover:scale-105 transition-transform">
+        <Button className="gap-2" data-testid="button-create-post">
           <PenSquare className="h-5 w-5" />
           Share Something
         </Button>
@@ -54,8 +54,8 @@ export function CreatePostDialog({ groupId }: { groupId?: number }) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Give your post a title..."
-              className="text-lg py-6"
               required
+              data-testid="input-post-title"
             />
           </div>
           <div className="space-y-2">
@@ -65,12 +65,13 @@ export function CreatePostDialog({ groupId }: { groupId?: number }) {
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="What's on your mind?"
-              className="min-h-[150px] text-lg resize-none"
+              className="min-h-[150px] resize-none"
               required
+              data-testid="input-post-content"
             />
           </div>
           <DialogFooter>
-            <Button type="submit" size="lg" disabled={createPost.isPending} className="w-full">
+            <Button type="submit" size="lg" disabled={createPost.isPending} className="w-full" data-testid="button-submit-post">
               {createPost.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -38,7 +38,7 @@ export function PostCard({ post }: { post: PostWithAuthor }) {
   const authorName = `${post.author.firstName || 'User'} ${post.author.lastName || ''}`;
 
   return (
-    <Card className="overflow-hidden border-2 border-border/50 shadow-md hover:shadow-lg transition-all duration-300">
+    <Card className="overflow-hidden border-2 border-border/50" data-testid={`card-post-${post.id}`}>
       <CardHeader className="flex flex-row items-center gap-4 bg-secondary/30 p-4">
         <Avatar className="h-12 w-12 border-2 border-background ring-2 ring-primary/10">
           <AvatarImage src={post.author.profileImageUrl || undefined} />
@@ -59,15 +59,16 @@ export function PostCard({ post }: { post: PostWithAuthor }) {
       </CardContent>
       <CardFooter className="bg-muted/30 p-4 flex flex-col gap-4">
         <div className="flex items-center gap-4 w-full">
-          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-primary">
+          <Button variant="ghost" size="sm" className="gap-2" data-testid={`button-like-${post.id}`}>
             <ThumbsUp className="h-5 w-5" />
             <span>{post.likesCount || 0} Likes</span>
           </Button>
           <Button 
             variant="ghost" 
             size="sm" 
-            className="gap-2 text-muted-foreground hover:text-primary"
+            className="gap-2"
             onClick={() => setShowComments(!showComments)}
+            data-testid={`button-comment-${post.id}`}
           >
             <MessageSquare className="h-5 w-5" />
             <span>Comment</span>
@@ -81,8 +82,9 @@ export function PostCard({ post }: { post: PostWithAuthor }) {
               onChange={(e) => setCommentText(e.target.value)}
               placeholder="Write a supportive comment..."
               className="bg-background"
+              data-testid={`input-comment-${post.id}`}
             />
-            <Button type="submit" disabled={createComment.isPending || !commentText.trim()}>
+            <Button type="submit" disabled={createComment.isPending || !commentText.trim()} data-testid={`button-submit-comment-${post.id}`}>
               Post
             </Button>
           </form>

@@ -5,29 +5,36 @@ interface SEOProps {
   description: string;
 }
 
+function setOrCreateMeta(property: string, content: string, isOg: boolean = false) {
+  const selector = isOg 
+    ? `meta[property="${property}"]`
+    : `meta[name="${property}"]`;
+  
+  let meta = document.querySelector(selector);
+  if (meta) {
+    meta.setAttribute("content", content);
+  } else {
+    meta = document.createElement("meta");
+    if (isOg) {
+      meta.setAttribute("property", property);
+    } else {
+      meta.setAttribute("name", property);
+    }
+    meta.setAttribute("content", content);
+    document.head.appendChild(meta);
+  }
+}
+
 export function SEO({ title, description }: SEOProps) {
   useEffect(() => {
-    document.title = `${title} | DisabilitySquare`;
+    const fullTitle = `${title} | DisabilitySquare`;
+    document.title = fullTitle;
     
-    const metaDescription = document.querySelector('meta[name="description"]');
-    if (metaDescription) {
-      metaDescription.setAttribute("content", description);
-    } else {
-      const meta = document.createElement("meta");
-      meta.name = "description";
-      meta.content = description;
-      document.head.appendChild(meta);
-    }
-    
-    const ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle) {
-      ogTitle.setAttribute("content", `${title} | DisabilitySquare`);
-    }
-    
-    const ogDescription = document.querySelector('meta[property="og:description"]');
-    if (ogDescription) {
-      ogDescription.setAttribute("content", description);
-    }
+    setOrCreateMeta("description", description);
+    setOrCreateMeta("og:title", fullTitle, true);
+    setOrCreateMeta("og:description", description, true);
+    setOrCreateMeta("og:type", "website", true);
+    setOrCreateMeta("og:site_name", "DisabilitySquare", true);
   }, [title, description]);
 
   return null;

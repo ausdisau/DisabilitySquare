@@ -59,6 +59,7 @@ export function Sidebar() {
                   ? "bg-primary text-primary-foreground shadow-md"
                   : "hover:bg-secondary text-foreground hover:translate-x-1"
               )}
+              data-testid={`link-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
             >
               <item.icon className={cn("h-6 w-6", location === item.href ? "text-primary-foreground" : "text-muted-foreground group-hover:text-primary")} />
               <span className="font-medium text-lg">{item.label}</span>
@@ -71,7 +72,7 @@ export function Sidebar() {
         {/* Accessibility Controls */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="w-full justify-start gap-3 h-auto py-3">
+            <Button variant="outline" className="w-full justify-start gap-3" data-testid="button-display-settings">
               <Eye className="h-5 w-5" />
               <span>Display Settings</span>
             </Button>
@@ -115,6 +116,7 @@ export function Sidebar() {
             variant="destructive" 
             className="w-full justify-start gap-2"
             onClick={() => logout()}
+            data-testid="button-logout"
           >
             <LogOut className="h-4 w-4" />
             Sign Out
