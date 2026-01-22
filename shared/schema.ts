@@ -35,6 +35,12 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   comments: many(comments),
   memberships: many(groupMembers),
   gameScores: many(gameScores),
+  pointsRecord: one(userPoints, {
+    fields: [users.id],
+    references: [userPoints.userId],
+  }),
+  badges: many(userBadges),
+  pointsHistory: many(pointsLedger),
 }));
 
 // === GROUPS ===
@@ -136,6 +142,88 @@ export const gameScoresRelations = relations(gameScores, ({ one }) => ({
   }),
 }));
 
+// === VALORIZATION SYSTEM ===
+
+// Badges that users can earn
+export const badges = pgTable("badges", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description").notNull(),
+  icon: text("icon").notNull(), // lucide icon name
+  category: text("category").notNull(), // 'connector', 'mentor', 'advocate', 'ally', 'contributor'
+  pointsRequired: integer("points_required").notNull().default(0),
+  color: text("color").notNull().default("#1B4B8A"), // Badge color
+});
+
+// User earned badges
+export const userBadges = pgTable("user_badges", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  badgeId: integer("badge_id").notNull().references(() => badges.id),
+  earnedAt: timestamp("earned_at").defaultNow(),
+});
+
+export const userBadgesRelations = relations(userBadges, ({ one }) => ({
+  user: one(users, {
+    fields: [userBadges.userId],
+    references: [users.id],
+  }),
+  badge: one(badges, {
+    fields: [userBadges.badgeId],
+    references: [badges.id],
+  }),
+}));
+
+// Points ledger - tracks all point transactions
+export const pointsLedger = pgTable("points_ledger", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  points: integer("points").notNull(),
+  actionType: text("action_type").notNull(), // 'post', 'comment', 'like_given', 'like_received', 'group_join', 'reply_to_other', 'mentored'
+  description: text("description"),
+  relatedUserId: varchar("related_user_id").references(() => users.id), // For cross-user interactions
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const pointsLedgerRelations = relations(pointsLedger, ({ one }) => ({
+  user: one(users, {
+    fields: [pointsLedger.userId],
+    references: [users.id],
+  }),
+  relatedUser: one(users, {
+    fields: [pointsLedger.relatedUserId],
+    references: [users.id],
+  }),
+}));
+
+// User total points cache for quick lookup
+export const userPoints = pgTable("user_points", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  totalPoints: integer("total_points").notNull().default(0),
+  level: integer("level").notNull().default(1),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const userPointsRelations = relations(userPoints, ({ one }) => ({
+  user: one(users, {
+    fields: [userPoints.userId],
+    references: [users.id],
+  }),
+}));
+
+// Point values for different actions
+export const POINT_VALUES = {
+  POST_CREATED: 10,
+  COMMENT_CREATED: 5,
+  LIKE_GIVEN: 1,
+  LIKE_RECEIVED: 2,
+  GROUP_JOINED: 5,
+  REPLY_TO_OTHER: 8, // Rewarding cross-user interaction
+  THOUGHTFUL_COMMENT: 15, // Comments over 100 chars
+  FIRST_POST_IN_GROUP: 20,
+  WELCOMED_NEWCOMER: 10,
+} as const;
 
 // === ZOD SCHEMAS ===
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, userId: true });
@@ -154,3 +242,18 @@ export type Comment = typeof comments.$inferSelect;
 export type InsertComment = z.infer<typeof insertCommentSchema>;
 export type GameScore = typeof gameScores.$inferSelect;
 export type InsertGameScore = z.infer<typeof insertGameScoreSchema>;
+
+// Valorization types
+export const insertBadgeSchema = createInsertSchema(badges).omit({ id: true });
+export const insertUserBadgeSchema = createInsertSchema(userBadges).omit({ id: true, earnedAt: true });
+export const insertPointsLedgerSchema = createInsertSchema(pointsLedger).omit({ id: true, createdAt: true });
+export const insertUserPointsSchema = createInsertSchema(userPoints).omit({ id: true, updatedAt: true });
+
+export type Badge = typeof badges.$inferSelect;
+export type InsertBadge = z.infer<typeof insertBadgeSchema>;
+export type UserBadge = typeof userBadges.$inferSelect;
+export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
+export type PointsLedgerEntry = typeof pointsLedger.$inferSelect;
+export type InsertPointsLedgerEntry = z.infer<typeof insertPointsLedgerSchema>;
+export type UserPoints = typeof userPoints.$inferSelect;
+export type InsertUserPoints = z.infer<typeof insertUserPointsSchema>;

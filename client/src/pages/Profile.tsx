@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/hooks/use-auth";
 import { useProfile, useUpdateProfile } from "@/hooks/use-profiles";
+import { useMyPoints, useMyBadges } from "@/hooks/use-valorization";
 import { Layout } from "@/components/Layout";
 import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
@@ -11,12 +12,26 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Star, Award, Trophy, Users, GraduationCap, Megaphone, HandHeart, UserPlus } from "lucide-react";
+
+const iconMap: Record<string, any> = {
+  Trophy,
+  Star,
+  Award,
+  Users,
+  GraduationCap,
+  Megaphone,
+  HandHeart,
+  UserPlus,
+};
 
 export default function Profile() {
   const { user } = useAuth();
   const { data: profile, isLoading } = useProfile(user?.id);
+  const { data: myPoints } = useMyPoints();
+  const { data: myBadges } = useMyBadges();
   const updateProfile = useUpdateProfile();
   const { toast } = useToast();
   
@@ -75,6 +90,62 @@ export default function Profile() {
             <p className="text-muted-foreground">{user?.email}</p>
           </div>
         </div>
+
+        {/* Points & Badges Card */}
+        <Card className="bg-gradient-to-r from-primary/5 to-accent/5 border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-primary" />
+              My Recognition
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="text-center p-4 bg-background rounded-lg">
+                <p className="text-4xl font-bold text-primary font-mono" data-testid="text-profile-points">
+                  {myPoints?.totalPoints || 0}
+                </p>
+                <p className="text-sm text-muted-foreground">Total Points</p>
+              </div>
+              <div className="text-center p-4 bg-background rounded-lg">
+                <p className="text-4xl font-bold text-accent font-mono" data-testid="text-profile-level">
+                  {myPoints?.level || 1}
+                </p>
+                <p className="text-sm text-muted-foreground">Level</p>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                <Award className="h-4 w-4" />
+                Earned Badges
+              </h4>
+              {myBadges && myBadges.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {myBadges.map((userBadge: any) => {
+                    const IconComponent = iconMap[userBadge.badge?.icon] || Award;
+                    return (
+                      <Badge 
+                        key={userBadge.id} 
+                        variant="secondary"
+                        className="flex items-center gap-1 px-3 py-1"
+                        style={{ backgroundColor: `${userBadge.badge?.color}20`, borderColor: userBadge.badge?.color }}
+                        data-testid={`badge-${userBadge.badge?.id}`}
+                      >
+                        <IconComponent className="h-3 w-3" style={{ color: userBadge.badge?.color }} />
+                        {userBadge.badge?.name}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No badges earned yet. Keep engaging with the community!
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <Card>

@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth0, registerAuth0Routes, isAuthenticated } from "./auth0";
 import { api } from "@shared/routes";
 import { z } from "zod";
+import { POINT_VALUES } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -56,10 +57,20 @@ export async function registerRoutes(
   app.post(api.groups.create.path, isAuthenticated, async (req: any, res) => {
     try {
       const input = api.groups.create.input.parse(req.body);
+      const userId = req.userId || req.oidc?.user?.sub;
       const group = await storage.createGroup({
         ...input,
-        createdById: req.userId || req.oidc?.user?.sub,
+        createdById: userId,
       });
+      
+      // Award points for creating a group
+      await storage.awardPoints({
+        userId,
+        points: POINT_VALUES.FIRST_POST_IN_GROUP,
+        actionType: 'group_created',
+        description: `Created group: "${group.name}"`,
+      });
+      
       res.status(201).json(group);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -80,10 +91,20 @@ export async function registerRoutes(
   app.post(api.posts.create.path, isAuthenticated, async (req: any, res) => {
     try {
       const input = api.posts.create.input.parse(req.body);
+      const userId = req.userId || req.oidc?.user?.sub;
       const post = await storage.createPost({
         ...input,
-        authorId: req.userId || req.oidc?.user?.sub,
+        authorId: userId,
       });
+      
+      // Award points for creating a post
+      await storage.awardPoints({
+        userId,
+        points: POINT_VALUES.POST_CREATED,
+        actionType: 'post_created',
+        description: `Created post: "${post.title.substring(0, 50)}${post.title.length > 50 ? '...' : ''}"`,
+      });
+      
       res.status(201).json(post);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -103,10 +124,45 @@ export async function registerRoutes(
   app.post(api.comments.create.path, isAuthenticated, async (req: any, res) => {
     try {
       const input = api.comments.create.input.parse(req.body);
+      const userId = req.userId || req.oidc?.user?.sub;
       const comment = await storage.createComment({
         ...input,
-        authorId: req.userId || req.oidc?.user?.sub,
+        authorId: userId,
       });
+      
+      // Get the post to check if this is a cross-user interaction
+      const post = await storage.getPost(input.postId);
+      const isThoughtful = input.content.length > 100;
+      const isCrossUser = post && post.authorId !== userId;
+      
+      // Award base points for commenting
+      let points = POINT_VALUES.COMMENT_CREATED;
+      let actionType = 'comment_created';
+      
+      if (isThoughtful) {
+        points = POINT_VALUES.THOUGHTFUL_COMMENT;
+        actionType = 'thoughtful_comment';
+      }
+      
+      await storage.awardPoints({
+        userId,
+        points,
+        actionType,
+        description: `Commented on a post`,
+        relatedUserId: isCrossUser ? post.authorId : undefined,
+      });
+      
+      // If cross-user interaction, also give points to post author
+      if (isCrossUser) {
+        await storage.awardPoints({
+          userId: post.authorId,
+          points: POINT_VALUES.REPLY_TO_OTHER,
+          actionType: 'received_engagement',
+          description: `Someone engaged with your post`,
+          relatedUserId: userId,
+        });
+      }
+      
       res.status(201).json(comment);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -136,6 +192,60 @@ export async function registerRoutes(
   app.get(api.games.leaderboard.path, async (req, res) => {
     const leaderboard = await storage.getLeaderboard(req.params.gameName);
     res.json(leaderboard);
+  });
+
+  // === VALORIZATION SYSTEM ===
+  
+  // Get current user's points
+  app.get(api.valorization.myPoints.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    let points = await storage.getUserPoints(userId);
+    if (!points) {
+      points = await storage.initializeUserPoints(userId);
+    }
+    res.json(points);
+  });
+
+  // Get any user's points
+  app.get(api.valorization.userPoints.path, async (req, res) => {
+    const points = await storage.getUserPoints(req.params.userId);
+    if (!points) {
+      return res.status(404).json({ message: "User points not found" });
+    }
+    res.json(points);
+  });
+
+  // Get points leaderboard
+  app.get(api.valorization.leaderboard.path, async (req, res) => {
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const leaderboard = await storage.getPointsLeaderboard(limit);
+    res.json(leaderboard);
+  });
+
+  // Get current user's badges
+  app.get(api.valorization.myBadges.path, isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    const userBadges = await storage.getUserBadges(userId);
+    res.json(userBadges);
+  });
+
+  // Get any user's badges
+  app.get(api.valorization.userBadges.path, async (req, res) => {
+    const userBadges = await storage.getUserBadges(req.params.userId);
+    res.json(userBadges);
+  });
+
+  // Get all available badges
+  app.get(api.valorization.allBadges.path, async (req, res) => {
+    const allBadges = await storage.getAllBadges();
+    res.json(allBadges);
+  });
+
+  // Get recent achievements (activity feed)
+  app.get(api.valorization.recentAchievements.path, async (req, res) => {
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+    const achievements = await storage.getRecentAchievements(limit);
+    res.json(achievements);
   });
 
   return httpServer;

@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useAccessibility } from "@/components/AccessbilityProvider";
+import { useMyPoints } from "@/hooks/use-valorization";
 import { 
   Home, 
   Users, 
@@ -9,7 +10,9 @@ import {
   User, 
   LogOut, 
   Eye, 
-  Type 
+  Type,
+  Trophy,
+  Star
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,10 +28,12 @@ export function Sidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
   const { highContrast, setHighContrast, fontSize, setFontSize } = useAccessibility();
+  const { data: myPoints } = useMyPoints();
 
   const navItems = [
     { href: "/", label: "Village Square", icon: Home },
     { href: "/groups", label: "Groups", icon: Users },
+    { href: "/recognition", label: "Recognition", icon: Trophy },
     { href: "/games", label: "Games", icon: Gamepad2 },
     { href: "/profile", label: "My Profile", icon: User },
   ];
@@ -100,6 +105,24 @@ export function Sidebar() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Points Display */}
+        {myPoints && (
+          <Link href="/recognition">
+            <div className="bg-gradient-to-r from-primary/10 to-accent/10 p-3 rounded-lg cursor-pointer hover:from-primary/20 hover:to-accent/20 transition-colors" data-testid="card-my-points">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-primary" />
+                  <span className="font-medium">My Points</span>
+                </div>
+                <div className="text-right">
+                  <p className="font-mono font-bold text-primary text-lg" data-testid="text-my-points">{myPoints.totalPoints}</p>
+                  <p className="text-xs text-muted-foreground">Level {myPoints.level}</p>
+                </div>
+              </div>
+            </div>
+          </Link>
+        )}
 
         {/* User Info & Logout */}
         <div className="bg-muted/30 p-3 rounded-lg">

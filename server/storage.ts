@@ -1,13 +1,19 @@
 import { db } from "./db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, sum } from "drizzle-orm";
 import { 
   users, profiles, groups, posts, comments, gameScores, groupMembers,
+  badges, userBadges, pointsLedger, userPoints,
   type User, type InsertUser,
   type Profile, type InsertProfile,
   type Group, type InsertGroup,
   type Post, type InsertPost,
   type Comment, type InsertComment,
-  type GameScore, type InsertGameScore
+  type GameScore, type InsertGameScore,
+  type Badge, type InsertBadge,
+  type UserBadge, type InsertUserBadge,
+  type PointsLedgerEntry, type InsertPointsLedgerEntry,
+  type UserPoints, type InsertUserPoints,
+  POINT_VALUES
 } from "@shared/schema";
 import { authStorage } from "./replit_integrations/auth/storage";
 
@@ -36,6 +42,16 @@ export interface IStorage {
   // Games
   createGameScore(score: InsertGameScore): Promise<GameScore>;
   getLeaderboard(gameName: string): Promise<(GameScore & { user: User })[]>;
+
+  // Valorization System
+  awardPoints(entry: InsertPointsLedgerEntry): Promise<PointsLedgerEntry>;
+  getUserPoints(userId: string): Promise<UserPoints | undefined>;
+  getPointsLeaderboard(limit?: number): Promise<(UserPoints & { user: User })[]>;
+  getUserBadges(userId: string): Promise<(UserBadge & { badge: Badge })[]>;
+  awardBadge(userId: string, badgeId: number): Promise<UserBadge>;
+  getAllBadges(): Promise<Badge[]>;
+  getRecentAchievements(limit?: number): Promise<(PointsLedgerEntry & { user: User })[]>;
+  initializeUserPoints(userId: string): Promise<UserPoints>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -143,6 +159,119 @@ export class DatabaseStorage implements IStorage {
       }
     });
     return scores as any;
+  }
+
+  // === VALORIZATION SYSTEM ===
+
+  async initializeUserPoints(userId: string): Promise<UserPoints> {
+    const existing = await this.getUserPoints(userId);
+    if (existing) return existing;
+    
+    const [newRecord] = await db.insert(userPoints).values({
+      userId,
+      totalPoints: 0,
+      level: 1,
+    }).returning();
+    return newRecord;
+  }
+
+  async awardPoints(entry: InsertPointsLedgerEntry): Promise<PointsLedgerEntry> {
+    // Create ledger entry
+    const [ledgerEntry] = await db.insert(pointsLedger).values(entry).returning();
+    
+    // Update or create user points record
+    const existing = await this.getUserPoints(entry.userId);
+    let newTotal = entry.points;
+    if (existing) {
+      newTotal = existing.totalPoints + entry.points;
+      const newLevel = Math.floor(newTotal / 100) + 1; // Level up every 100 points
+      await db.update(userPoints)
+        .set({ 
+          totalPoints: newTotal, 
+          level: newLevel,
+          updatedAt: new Date() 
+        })
+        .where(eq(userPoints.userId, entry.userId));
+    } else {
+      await db.insert(userPoints).values({
+        userId: entry.userId,
+        totalPoints: entry.points,
+        level: 1,
+      });
+    }
+    
+    // Check and award badges based on new total points
+    await this.checkAndAwardBadges(entry.userId, newTotal);
+    
+    return ledgerEntry;
+  }
+
+  private async checkAndAwardBadges(userId: string, totalPoints: number): Promise<void> {
+    // Get all badges the user doesn't have yet
+    const allBadgesList = await this.getAllBadges();
+    const userBadgesList = await this.getUserBadges(userId);
+    const earnedBadgeIds = new Set(userBadgesList.map(ub => ub.badgeId));
+    
+    // Award badges where user meets the points threshold
+    for (const badge of allBadgesList) {
+      if (!earnedBadgeIds.has(badge.id) && totalPoints >= badge.pointsRequired) {
+        await this.awardBadge(userId, badge.id);
+      }
+    }
+  }
+
+  async getUserPoints(userId: string): Promise<UserPoints | undefined> {
+    const [record] = await db.select().from(userPoints).where(eq(userPoints.userId, userId));
+    return record;
+  }
+
+  async getPointsLeaderboard(limit: number = 10): Promise<(UserPoints & { user: User })[]> {
+    const leaders = await db.query.userPoints.findMany({
+      orderBy: [desc(userPoints.totalPoints)],
+      limit,
+      with: {
+        user: true
+      }
+    });
+    return leaders as any;
+  }
+
+  async getUserBadges(userId: string): Promise<(UserBadge & { badge: Badge })[]> {
+    const userBadgesList = await db.query.userBadges.findMany({
+      where: eq(userBadges.userId, userId),
+      with: {
+        badge: true
+      }
+    });
+    return userBadgesList as any;
+  }
+
+  async awardBadge(userId: string, badgeId: number): Promise<UserBadge> {
+    // Check if already has badge
+    const existing = await db.select().from(userBadges)
+      .where(and(eq(userBadges.userId, userId), eq(userBadges.badgeId, badgeId)));
+    if (existing.length > 0) return existing[0];
+    
+    const [newBadge] = await db.insert(userBadges).values({
+      userId,
+      badgeId,
+    }).returning();
+    return newBadge;
+  }
+
+  async getAllBadges(): Promise<Badge[]> {
+    return await db.select().from(badges);
+  }
+
+  async getRecentAchievements(limit: number = 20): Promise<(PointsLedgerEntry & { user: User })[]> {
+    const recent = await db.query.pointsLedger.findMany({
+      orderBy: [desc(pointsLedger.createdAt)],
+      limit,
+      with: {
+        user: true
+      }
+    });
+    return recent as any;
   }
 }
 

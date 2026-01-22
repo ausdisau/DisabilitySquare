@@ -5,7 +5,8 @@ import {
   insertPostSchema, 
   insertCommentSchema, 
   insertGameScoreSchema,
-  profiles, groups, posts, comments, gameScores 
+  insertPointsLedgerSchema,
+  profiles, groups, posts, comments, gameScores, badges, userBadges, pointsLedger, userPoints
 } from './schema';
 
 export const errorSchemas = {
@@ -133,6 +134,60 @@ export const api = {
       path: '/api/games/:gameName/leaderboard',
       responses: {
         200: z.array(z.custom<typeof gameScores.$inferSelect & { user: { firstName: string | null, lastName: string | null } }>()),
+      },
+    },
+  },
+  valorization: {
+    myPoints: {
+      method: 'GET' as const,
+      path: '/api/valorization/my-points',
+      responses: {
+        200: z.custom<typeof userPoints.$inferSelect>(),
+        401: errorSchemas.unauthorized,
+      },
+    },
+    userPoints: {
+      method: 'GET' as const,
+      path: '/api/valorization/users/:userId/points',
+      responses: {
+        200: z.custom<typeof userPoints.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    leaderboard: {
+      method: 'GET' as const,
+      path: '/api/valorization/leaderboard',
+      responses: {
+        200: z.array(z.custom<typeof userPoints.$inferSelect & { user: { firstName: string | null, lastName: string | null, profileImageUrl: string | null } }>()),
+      },
+    },
+    myBadges: {
+      method: 'GET' as const,
+      path: '/api/valorization/my-badges',
+      responses: {
+        200: z.array(z.custom<typeof userBadges.$inferSelect & { badge: typeof badges.$inferSelect }>()),
+        401: errorSchemas.unauthorized,
+      },
+    },
+    userBadges: {
+      method: 'GET' as const,
+      path: '/api/valorization/users/:userId/badges',
+      responses: {
+        200: z.array(z.custom<typeof userBadges.$inferSelect & { badge: typeof badges.$inferSelect }>()),
+      },
+    },
+    allBadges: {
+      method: 'GET' as const,
+      path: '/api/valorization/badges',
+      responses: {
+        200: z.array(z.custom<typeof badges.$inferSelect>()),
+      },
+    },
+    recentAchievements: {
+      method: 'GET' as const,
+      path: '/api/valorization/achievements',
+      responses: {
+        200: z.array(z.custom<typeof pointsLedger.$inferSelect & { user: { firstName: string | null, lastName: string | null, profileImageUrl: string | null } }>()),
       },
     },
   },
