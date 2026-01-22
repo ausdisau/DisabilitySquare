@@ -274,6 +274,63 @@ export async function registerRoutes(
     res.json(achievements);
   });
 
+  // === USER REPORTS (eSafety compliance) ===
+  
+  // Report a user (e.g., for being underage)
+  app.post("/api/reports", isAuthenticated, async (req: any, res) => {
+    const reporterId = req.userId || req.oidc?.user?.sub;
+    
+    try {
+      const schema = z.object({
+        reportedUserId: z.string().min(1),
+        reportType: z.enum(['underage', 'harassment', 'inappropriate_content', 'spam', 'other']),
+        reason: z.string().optional(),
+      });
+      
+      const input = schema.parse(req.body);
+      
+      // Prevent self-reporting
+      if (input.reportedUserId === reporterId) {
+        return res.status(400).json({ message: "You cannot report yourself" });
+      }
+      
+      // Check if user has already reported this person for this reason
+      const alreadyReported = await storage.hasReportedUser(
+        reporterId, 
+        input.reportedUserId, 
+        input.reportType
+      );
+      
+      if (alreadyReported) {
+        return res.status(400).json({ message: "You have already submitted this report" });
+      }
+      
+      const report = await storage.createUserReport({
+        reporterId,
+        reportedUserId: input.reportedUserId,
+        reportType: input.reportType,
+        reason: input.reason,
+        status: 'pending',
+      });
+      
+      res.status(201).json({ success: true, reportId: report.id });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Check if current user has reported another user (for UI feedback)
+  app.get("/api/reports/check/:userId/:reportType", isAuthenticated, async (req: any, res) => {
+    const reporterId = req.userId || req.oidc?.user?.sub;
+    const { userId, reportType } = req.params;
+    
+    const hasReported = await storage.hasReportedUser(reporterId, userId, reportType);
+    res.json({ hasReported });
+  });
+
   // === EXTENSION ROUTES ===
 
   // Get all extensions

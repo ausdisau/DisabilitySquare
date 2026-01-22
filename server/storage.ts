@@ -2,7 +2,7 @@ import { db } from "./db";
 import { eq, desc, and, sql, sum } from "drizzle-orm";
 import { 
   users, profiles, groups, posts, comments, gameScores, groupMembers,
-  badges, userBadges, pointsLedger, userPoints,
+  badges, userBadges, pointsLedger, userPoints, userReports,
   type User, type InsertUser,
   type Profile, type InsertProfile,
   type Group, type InsertGroup,
@@ -13,6 +13,7 @@ import {
   type UserBadge, type InsertUserBadge,
   type PointsLedgerEntry, type InsertPointsLedgerEntry,
   type UserPoints, type InsertUserPoints,
+  type UserReport, type InsertUserReport,
   POINT_VALUES
 } from "@shared/schema";
 
@@ -52,6 +53,11 @@ export interface IStorage {
   getAllBadges(): Promise<Badge[]>;
   getRecentAchievements(limit?: number): Promise<(PointsLedgerEntry & { user: User })[]>;
   initializeUserPoints(userId: string): Promise<UserPoints>;
+  
+  // User Reports (eSafety compliance)
+  createUserReport(report: InsertUserReport): Promise<UserReport>;
+  getUserReports(userId: string): Promise<UserReport[]>;
+  hasReportedUser(reporterId: string, reportedUserId: string, reportType: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -277,6 +283,29 @@ export class DatabaseStorage implements IStorage {
       }
     });
     return recent as any;
+  }
+  
+  // User Reports (eSafety compliance)
+  async createUserReport(report: InsertUserReport): Promise<UserReport> {
+    const [newReport] = await db.insert(userReports).values(report).returning();
+    return newReport;
+  }
+  
+  async getUserReports(userId: string): Promise<UserReport[]> {
+    return await db.select().from(userReports)
+      .where(eq(userReports.reportedUserId, userId))
+      .orderBy(desc(userReports.createdAt));
+  }
+  
+  async hasReportedUser(reporterId: string, reportedUserId: string, reportType: string): Promise<boolean> {
+    const existing = await db.select().from(userReports).where(
+      and(
+        eq(userReports.reporterId, reporterId),
+        eq(userReports.reportedUserId, reportedUserId),
+        eq(userReports.reportType, reportType)
+      )
+    );
+    return existing.length > 0;
   }
 }
 

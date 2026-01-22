@@ -7,9 +7,12 @@ import { MessageSquare, ThumbsUp } from "lucide-react";
 import { useState } from "react";
 import { useCreateComment } from "@/hooks/use-posts";
 import { Input } from "@/components/ui/input";
+import { ReportUserButton } from "@/components/ReportUserButton";
+import { useAuth } from "@/hooks/use-auth";
 
 type PostWithAuthor = Post & {
   author: {
+    id?: string;
     firstName: string | null;
     lastName: string | null;
     profileImageUrl: string | null;
@@ -21,6 +24,7 @@ export function PostCard({ post }: { post: PostWithAuthor }) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
   const createComment = useCreateComment();
+  const { user } = useAuth();
 
   const handleComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,12 +50,19 @@ export function PostCard({ post }: { post: PostWithAuthor }) {
             {authorInitials}
           </AvatarFallback>
         </Avatar>
-        <div>
+        <div className="flex-1">
           <h3 className="font-bold text-lg leading-tight">{authorName}</h3>
           <p className="text-sm text-muted-foreground">
             {formatDistanceToNow(new Date(post.createdAt || new Date()), { addSuffix: true })}
           </p>
         </div>
+        {post.author.id && post.author.id !== user?.id && (
+          <ReportUserButton 
+            userId={post.author.id} 
+            userName={authorName}
+            variant="dropdown"
+          />
+        )}
       </CardHeader>
       <CardContent className="p-6">
         <h4 className="text-xl font-bold mb-3 font-display text-primary">{post.title}</h4>

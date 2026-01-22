@@ -1,12 +1,13 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AccessibilityProvider } from "@/components/AccessbilityProvider";
 import { SidebarStateProvider } from "@/hooks/use-sidebar-state";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
+import { AgeVerificationOnboarding } from "@/components/AgeVerificationOnboarding";
 
 // Pages
 import Landing from "@/pages/Landing";
@@ -23,8 +24,18 @@ import NotFound from "@/pages/not-found";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
   const { isAuthenticated, isLoading } = useAuth();
+  
+  const { data: authStatus, isLoading: statusLoading } = useQuery({
+    queryKey: ["/api/auth/status"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/status", { credentials: "include" });
+      return res.json() as Promise<{ isAuthenticated: boolean; ageVerified: boolean }>;
+    },
+    enabled: isAuthenticated,
+    refetchOnWindowFocus: false,
+  });
 
-  if (isLoading) {
+  if (isLoading || (isAuthenticated && statusLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -33,8 +44,17 @@ function PrivateRoute({ component: Component, ...rest }: any) {
   }
 
   if (!isAuthenticated) {
-    // Redirect logic is handled inside Landing or via redirect
     return <Landing />;
+  }
+
+  if (authStatus && !authStatus.ageVerified) {
+    return (
+      <AgeVerificationOnboarding 
+        onVerified={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/status"] });
+        }} 
+      />
+    );
   }
 
   return <Component {...rest} />;

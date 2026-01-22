@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, varchar, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, varchar, jsonb, unique } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -411,6 +411,50 @@ export interface ExtensionManifest {
   permissions: string[];
   defaultConfig?: Record<string, any>;
 }
+
+// === USER REPORTS (for safety/eSafety compliance) ===
+export const userReports = pgTable("user_reports", {
+  id: serial("id").primaryKey(),
+  reporterId: varchar("reporter_id").notNull().references(() => users.id),
+  reportedUserId: varchar("reported_user_id").notNull().references(() => users.id),
+  reportType: varchar("report_type", { length: 50 }).notNull(), // 'underage', 'harassment', 'inappropriate_content', etc.
+  reason: text("reason"),
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // 'pending', 'reviewed', 'dismissed', 'actioned'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  adminNotes: text("admin_notes"),
+}, (table) => ({
+  uniqueReport: unique("unique_report_per_user_type").on(table.reporterId, table.reportedUserId, table.reportType),
+}));
+
+export const userReportsRelations = relations(userReports, ({ one }) => ({
+  reporter: one(users, {
+    fields: [userReports.reporterId],
+    references: [users.id],
+    relationName: "reporter",
+  }),
+  reportedUser: one(users, {
+    fields: [userReports.reportedUserId],
+    references: [users.id],
+    relationName: "reportedUser",
+  }),
+  reviewer: one(users, {
+    fields: [userReports.reviewedBy],
+    references: [users.id],
+    relationName: "reviewer",
+  }),
+}));
+
+export const insertUserReportSchema = createInsertSchema(userReports).omit({ 
+  id: true, 
+  createdAt: true, 
+  reviewedAt: true, 
+  reviewedBy: true, 
+  adminNotes: true 
+});
+export type UserReport = typeof userReports.$inferSelect;
+export type InsertUserReport = z.infer<typeof insertUserReportSchema>;
 
 // === AI CHAT CONVERSATIONS (for voice features) ===
 export const conversations = pgTable("conversations", {

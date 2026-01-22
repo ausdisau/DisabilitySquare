@@ -1,7 +1,7 @@
 import { auth, requiresAuth } from "express-openid-connect";
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "./db";
-import { users } from "@shared/schema";
+import { users, profiles } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export function setupAuth0(app: Express) {
@@ -103,6 +103,34 @@ export function getCurrentUser(req: Request) {
   };
 }
 
+// Middleware to require age verification (eSafety compliance)
+export const requiresAgeVerification = async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.oidc?.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  try {
+    const userId = req.oidc.user?.sub;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const [profile] = await db.select().from(profiles).where(eq(profiles.userId, userId));
+    
+    if (!profile || !profile.ageVerified) {
+      return res.status(403).json({ 
+        message: "Age verification required", 
+        code: "AGE_VERIFICATION_REQUIRED" 
+      });
+    }
+    
+    next();
+  } catch (error) {
+    console.error("Error checking age verification:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 // Register Auth0 specific routes
 export function registerAuth0Routes(app: Express) {
   // Get current user info
@@ -121,10 +149,23 @@ export function registerAuth0Routes(app: Express) {
     });
   });
   
-  // Health check for auth status
-  app.get("/api/auth/status", (req, res) => {
+  // Health check for auth status with age verification info
+  app.get("/api/auth/status", async (req, res) => {
+    const isAuthenticated = req.oidc?.isAuthenticated() || false;
+    let ageVerified = false;
+    
+    if (isAuthenticated && req.oidc?.user?.sub) {
+      try {
+        const [profile] = await db.select().from(profiles).where(eq(profiles.userId, req.oidc.user.sub));
+        ageVerified = profile?.ageVerified === true;
+      } catch (error) {
+        console.error("Error checking age verification:", error);
+      }
+    }
+    
     res.json({
-      isAuthenticated: req.oidc?.isAuthenticated() || false,
+      isAuthenticated,
+      ageVerified,
     });
   });
 }

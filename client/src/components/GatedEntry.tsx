@@ -34,11 +34,8 @@ export function GatedEntry({ onComplete }: GatedEntryProps) {
     setError("");
     
     try {
-      const result = await apiRequest<{ success: boolean; message?: string }>("/api/verify-captcha", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
+      const res = await apiRequest("POST", "/api/verify-captcha", { token });
+      const result = await res.json() as { success: boolean; message?: string };
       
       if (result.success) {
         setCaptchaVerified(true);

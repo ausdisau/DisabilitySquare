@@ -36,6 +36,15 @@ export function AgeGate({ onVerified, onUnderage }: AgeGateProps) {
     { value: "12", label: "December" },
   ];
 
+  const isValidDate = (d: number, m: number, y: number): boolean => {
+    const date = new Date(y, m - 1, d);
+    return (
+      date.getFullYear() === y &&
+      date.getMonth() === m - 1 &&
+      date.getDate() === d
+    );
+  };
+
   const calculateAge = (birthDate: Date): number => {
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
@@ -55,10 +64,24 @@ export function AgeGate({ onVerified, onUnderage }: AgeGateProps) {
       return;
     }
 
-    const birthDate = new Date(Number(year), Number(month) - 1, Number(day));
+    const dayNum = Number(day);
+    const monthNum = Number(month);
+    const yearNum = Number(year);
+
+    if (!isValidDate(dayNum, monthNum, yearNum)) {
+      setError("Please enter a valid date (e.g., February 30 is not valid)");
+      return;
+    }
+
+    const birthDate = new Date(yearNum, monthNum - 1, dayNum);
     
     if (isNaN(birthDate.getTime())) {
       setError("Please enter a valid date");
+      return;
+    }
+
+    if (birthDate > new Date()) {
+      setError("Date of birth cannot be in the future");
       return;
     }
 
@@ -66,6 +89,8 @@ export function AgeGate({ onVerified, onUnderage }: AgeGateProps) {
 
     if (age < MINIMUM_AGE) {
       onUnderage();
+    } else if (age > 120) {
+      setError("Please enter a valid date of birth");
     } else {
       localStorage.setItem("ageVerificationPassed", "true");
       localStorage.setItem("dateOfBirth", birthDate.toISOString());
