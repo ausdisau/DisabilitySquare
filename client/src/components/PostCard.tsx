@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useCreateComment } from "@/hooks/use-posts";
 import { Input } from "@/components/ui/input";
 import { ReportUserButton } from "@/components/ReportUserButton";
+import { TextToSpeech } from "@/components/TextToSpeech";
 import { useAuth } from "@/hooks/use-auth";
 
 type PostWithAuthor = Post & {
@@ -84,6 +85,12 @@ export function PostCard({ post }: { post: PostWithAuthor }) {
             <MessageSquare className="h-5 w-5" />
             <span>Comment</span>
           </Button>
+          <div className="ml-auto">
+            <TextToSpeech 
+              text={`${post.title}. ${post.content}`} 
+              label="Read this post aloud"
+            />
+          </div>
         </div>
         
         {showComments && (
