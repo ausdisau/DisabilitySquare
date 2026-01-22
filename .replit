@@ -45,3 +45,4 @@ integrations = ["javascript_log_in_with_replit:2.0.0"]
 
 [userenv.shared]
 AUTH0_ISSUER_BASE_URL_OVERRIDE = "https://ad-id.au.auth0.com"
+AUTH0_CLIENT_ID_OVERRIDE = "DPA7oLD6awhbJIiFSgXO7o3AjsqYOV6n"

@@ -15,6 +15,9 @@ export function setupAuth0(app: Express) {
   // Remove trailing slash if present
   issuerBaseURL = issuerBaseURL.replace(/\/$/, "");
 
+  // Get Client ID with override support (to work around Replit env caching)
+  const clientID = process.env.AUTH0_CLIENT_ID_OVERRIDE || process.env.AUTH0_CLIENT_ID;
+
   // Determine the base URL for the app
   const baseURL = process.env.REPLIT_DEV_DOMAIN 
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
@@ -25,7 +28,7 @@ export function setupAuth0(app: Express) {
     auth0Logout: true,
     secret: process.env.AUTH0_SECRET || process.env.SESSION_SECRET,
     baseURL,
-    clientID: process.env.AUTH0_CLIENT_ID,
+    clientID,
     issuerBaseURL,
     routes: {
       login: "/api/auth/login",
@@ -36,7 +39,7 @@ export function setupAuth0(app: Express) {
 
   // Only set up Auth0 if credentials are configured
   if (config.clientID && config.issuerBaseURL) {
-    console.log(`Auth0 config: issuerBaseURL=${config.issuerBaseURL}, baseURL=${config.baseURL}`);
+    console.log(`Auth0 config: issuerBaseURL=${config.issuerBaseURL}, baseURL=${config.baseURL}, clientID=${config.clientID}`);
     app.use(auth(config));
     console.log("Auth0 authentication enabled");
   } else {
