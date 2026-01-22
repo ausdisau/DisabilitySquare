@@ -40,3 +40,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_log_in_with_replit:2.0.0"]
+
+[userenv]
+
+[userenv.shared]
+AUTH0_ISSUER_BASE_URL_OVERRIDE = "https://ad-id.au.auth0.com"

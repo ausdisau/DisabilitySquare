@@ -5,19 +5,26 @@ import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export function setupAuth0(app: Express) {
+  // Check for override first, then regular env var
+  let issuerBaseURL = process.env.AUTH0_ISSUER_BASE_URL_OVERRIDE || process.env.AUTH0_ISSUER_BASE_URL || "";
+  
   // Ensure issuerBaseURL has https:// prefix
-  let issuerBaseURL = process.env.AUTH0_ISSUER_BASE_URL || "";
   if (issuerBaseURL && !issuerBaseURL.startsWith("https://") && !issuerBaseURL.startsWith("http://")) {
     issuerBaseURL = `https://${issuerBaseURL}`;
   }
   // Remove trailing slash if present
   issuerBaseURL = issuerBaseURL.replace(/\/$/, "");
 
+  // Determine the base URL for the app
+  const baseURL = process.env.REPLIT_DEV_DOMAIN 
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : process.env.AUTH0_BASE_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+
   const config = {
     authRequired: false,
     auth0Logout: true,
     secret: process.env.AUTH0_SECRET || process.env.SESSION_SECRET,
-    baseURL: process.env.AUTH0_BASE_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`,
+    baseURL,
     clientID: process.env.AUTH0_CLIENT_ID,
     issuerBaseURL,
     routes: {
