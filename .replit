@@ -47,3 +47,4 @@ integrations = ["javascript_log_in_with_replit:2.0.0", "javascript_openai_ai_int
 AUTH0_ISSUER_BASE_URL_OVERRIDE = "https://ad-id.au.auth0.com"
 AUTH0_CLIENT_ID_OVERRIDE = "ZhGQuCxzqVvsWSzihhGMG2y3iAsL6g9H"
 SUPABASE_URL = "bktcjduqkdulrvqmumxn"
+VITE_HCAPTCHA_SITE_KEY = "${HCAPTCHA_SITE_KEY}"

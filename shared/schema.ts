@@ -17,6 +17,9 @@ export const profiles = pgTable("profiles", {
     highContrast: boolean;
     fontSize: "normal" | "large" | "extra-large";
   }>().default({ highContrast: false, fontSize: "normal" }),
+  dateOfBirth: timestamp("date_of_birth"),
+  ageVerified: boolean("age_verified").default(false),
+  ageVerifiedAt: timestamp("age_verified_at"),
 });
 
 export const profilesRelations = relations(profiles, ({ one }) => ({

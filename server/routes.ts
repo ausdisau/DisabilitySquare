@@ -368,6 +368,100 @@ export async function registerRoutes(
     res.json(logs);
   });
 
+  // === HCAPTCHA & AGE VERIFICATION ===
+  
+  // Get hCaptcha site key (public, safe to expose)
+  app.get('/api/config/hcaptcha', (req, res) => {
+    res.json({ siteKey: process.env.HCAPTCHA_SITE_KEY || '' });
+  });
+
+  // Verify hCaptcha token
+  app.post('/api/verify-captcha', async (req, res) => {
+    try {
+      const { token } = req.body;
+      if (!token) {
+        return res.status(400).json({ success: false, message: 'Captcha token required' });
+      }
+
+      const secretKey = process.env.HCAPTCHA_SECRET_KEY;
+      if (!secretKey) {
+        return res.status(500).json({ success: false, message: 'hCaptcha not configured' });
+      }
+
+      const response = await fetch('https://api.hcaptcha.com/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          secret: secretKey,
+          response: token,
+        }),
+      });
+
+      const data = await response.json() as { success: boolean; 'error-codes'?: string[] };
+      
+      if (data.success) {
+        res.json({ success: true });
+      } else {
+        res.status(400).json({ 
+          success: false, 
+          message: 'Captcha verification failed',
+          errors: data['error-codes'] 
+        });
+      }
+    } catch (error) {
+      console.error('hCaptcha verification error:', error);
+      res.status(500).json({ success: false, message: 'Verification failed' });
+    }
+  });
+
+  // Update profile with age verification
+  app.post('/api/verify-age', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const { dateOfBirth } = req.body;
+      
+      if (!dateOfBirth) {
+        return res.status(400).json({ success: false, message: 'Date of birth required' });
+      }
+
+      const dob = new Date(dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const monthDiff = today.getMonth() - dob.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+        age--;
+      }
+
+      if (age < 16) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'You must be at least 16 years old to use DisabilitySquare' 
+        });
+      }
+
+      let profile = await storage.getProfile(userId);
+      if (!profile) {
+        profile = await storage.createProfile({ 
+          userId, 
+          dateOfBirth: dob,
+          ageVerified: true,
+          ageVerifiedAt: new Date()
+        } as any);
+      } else {
+        profile = await storage.updateProfile(userId, {
+          dateOfBirth: dob,
+          ageVerified: true,
+          ageVerifiedAt: new Date()
+        } as any);
+      }
+
+      res.json({ success: true, profile });
+    } catch (error) {
+      console.error('Age verification error:', error);
+      res.status(500).json({ success: false, message: 'Verification failed' });
+    }
+  });
+
   // === VOICE TRANSCRIPTION (Accessibility Feature) ===
   const MAX_AUDIO_SIZE = 10 * 1024 * 1024; // 10MB limit
   
