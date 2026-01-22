@@ -368,5 +368,26 @@ export async function registerRoutes(
     res.json(logs);
   });
 
+  // === VOICE TRANSCRIPTION (Accessibility Feature) ===
+  app.post('/api/transcribe', isAuthenticated, async (req: any, res) => {
+    try {
+      const { audio } = req.body;
+      if (!audio) {
+        return res.status(400).json({ message: 'Audio data required' });
+      }
+      
+      const { speechToText, ensureCompatibleFormat } = await import('./replit_integrations/audio/client');
+      
+      const rawBuffer = Buffer.from(audio, 'base64');
+      const { buffer: audioBuffer, format } = await ensureCompatibleFormat(rawBuffer);
+      const transcript = await speechToText(audioBuffer, format);
+      
+      res.json({ transcript });
+    } catch (error) {
+      console.error('Transcription error:', error);
+      res.status(500).json({ message: 'Failed to transcribe audio' });
+    }
+  });
+
   return httpServer;
 }

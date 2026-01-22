@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { PenSquare, Loader2 } from "lucide-react";
+import { VoiceInput } from "@/components/VoiceInput";
 
 export function CreatePostDialog({ groupId }: { groupId?: number }) {
   const [open, setOpen] = useState(false);
@@ -59,12 +60,20 @@ export function CreatePostDialog({ groupId }: { groupId?: number }) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="content" className="text-lg">Content</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="content" className="text-lg">Content</Label>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <VoiceInput 
+                  onTranscript={(text) => setContent((prev) => prev ? `${prev} ${text}` : text)} 
+                />
+                <span className="sr-only">Click to dictate your post</span>
+              </div>
+            </div>
             <Textarea
               id="content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="What's on your mind?"
+              placeholder="What's on your mind? Click the mic to dictate..."
               className="min-h-[150px] resize-none"
               required
               data-testid="input-post-content"
