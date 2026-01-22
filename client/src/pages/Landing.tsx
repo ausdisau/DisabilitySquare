@@ -5,34 +5,13 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { LoginModal } from "@/components/LoginModal";
-import { GatedEntry } from "@/components/GatedEntry";
 
 export default function Landing() {
   const { isAuthenticated, isLoading } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showGatedEntry, setShowGatedEntry] = useState(false);
-  const [gateCompleted, setGateCompleted] = useState(() => {
-    const ageVerified = localStorage.getItem("ageVerificationPassed");
-    const captchaSession = sessionStorage.getItem("captchaVerified");
-    return ageVerified === "true" && captchaSession === "true";
-  });
 
   if (isLoading) return null;
   if (isAuthenticated) return <Redirect to="/" />;
-
-  const handleJoinClick = () => {
-    if (gateCompleted) {
-      setShowLoginModal(true);
-    } else {
-      setShowGatedEntry(true);
-    }
-  };
-
-  const handleGateComplete = () => {
-    setGateCompleted(true);
-    setShowGatedEntry(false);
-    setShowLoginModal(true);
-  };
 
   return (
     <>
@@ -87,7 +66,7 @@ export default function Landing() {
           <div className="flex flex-col sm:flex-row gap-4">
             <Button 
               size="lg" 
-              onClick={handleJoinClick}
+              onClick={() => setShowLoginModal(true)}
               data-testid="button-join-community"
             >
               Join the Community <ArrowRight className="ml-2 h-5 w-5" />
@@ -96,14 +75,6 @@ export default function Landing() {
         </div>
       </div>
 
-      {showGatedEntry && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md">
-            <GatedEntry onComplete={handleGateComplete} />
-          </div>
-        </div>
-      )}
-
       <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
 
       {/* Right: Hero Image/Visual */}
@@ -111,8 +82,6 @@ export default function Landing() {
         {/* Abstract "Village Square" representation */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/20" />
         <div className="absolute inset-0 flex items-center justify-center p-12">
-           {/* Placeholder for Hero Image - using Unsplash with descriptive alt */}
-           {/* inclusive community gathering outdoor park */}
            <img 
              src="https://images.unsplash.com/photo-1573497620053-ea5300f94f21?q=80&w=2070&auto=format&fit=crop" 
              alt="Diverse group of friends smiling together outdoors"
