@@ -60,14 +60,11 @@ export function CreatePostDialog({ groupId }: { groupId?: number }) {
             />
           </div>
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <Label htmlFor="content" className="text-lg">Content</Label>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <VoiceInput 
-                  onTranscript={(text) => setContent((prev) => prev ? `${prev} ${text}` : text)} 
-                />
-                <span className="sr-only">Click to dictate your post</span>
-              </div>
+              <VoiceInput 
+                onTranscript={(text) => setContent((prev) => prev ? `${prev} ${text}` : text)} 
+              />
             </div>
             <Textarea
               id="content"

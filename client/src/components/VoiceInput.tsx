@@ -1,8 +1,13 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Loader2 } from "lucide-react";
+import { Mic, MicOff, Loader2, MicOffIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type RecordingState = "idle" | "recording" | "processing";
 
@@ -10,12 +15,20 @@ interface VoiceInputProps {
   onTranscript: (text: string) => void;
   disabled?: boolean;
   className?: string;
+  showLabel?: boolean;
 }
 
-export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProps) {
+export function VoiceInput({ onTranscript, disabled, className, showLabel }: VoiceInputProps) {
   const [state, setState] = useState<RecordingState>("idle");
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [isSupported, setIsSupported] = useState(true);
   const { toast } = useToast();
+  
+  useEffect(() => {
+    if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setIsSupported(false);
+    }
+  }, []);
 
   const startRecording = useCallback(async () => {
     try {
@@ -93,7 +106,40 @@ export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProp
     }
   };
 
-  return (
+  const getStatusText = () => {
+    switch (state) {
+      case "recording":
+        return "Recording... Click to stop";
+      case "processing":
+        return "Converting speech to text...";
+      default:
+        return "Click to dictate";
+    }
+  };
+
+  if (!isSupported) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled
+            className={className}
+            data-testid="button-voice-input-unsupported"
+          >
+            <MicOffIcon className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Voice input is not supported in your browser</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  const button = (
     <Button
       type="button"
       variant={state === "recording" ? "destructive" : "outline"}
@@ -101,13 +147,7 @@ export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProp
       onClick={handleClick}
       disabled={disabled || state === "processing"}
       className={className}
-      aria-label={
-        state === "recording"
-          ? "Stop recording"
-          : state === "processing"
-          ? "Processing voice"
-          : "Start voice input"
-      }
+      aria-label={getStatusText()}
       data-testid="button-voice-input"
     >
       {state === "processing" ? (
@@ -118,6 +158,23 @@ export function VoiceInput({ onTranscript, disabled, className }: VoiceInputProp
         <Mic className="h-4 w-4" />
       )}
     </Button>
+  );
+
+  return (
+    <div className="flex items-center gap-2">
+      <Tooltip>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent>
+          <p>{getStatusText()}</p>
+        </TooltipContent>
+      </Tooltip>
+      {showLabel && (
+        <span className="text-sm text-muted-foreground">{getStatusText()}</span>
+      )}
+      <span aria-live="polite" className="sr-only">
+        {state !== "idle" && getStatusText()}
+      </span>
+    </div>
   );
 }
 

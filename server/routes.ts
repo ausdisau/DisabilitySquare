@@ -369,6 +369,8 @@ export async function registerRoutes(
   });
 
   // === VOICE TRANSCRIPTION (Accessibility Feature) ===
+  const MAX_AUDIO_SIZE = 10 * 1024 * 1024; // 10MB limit
+  
   app.post('/api/transcribe', isAuthenticated, async (req: any, res) => {
     try {
       const { audio } = req.body;
@@ -376,16 +378,28 @@ export async function registerRoutes(
         return res.status(400).json({ message: 'Audio data required' });
       }
       
+      if (typeof audio !== 'string' || audio.length > MAX_AUDIO_SIZE * 1.37) {
+        return res.status(400).json({ message: 'Audio file too large (max 10MB)' });
+      }
+      
       const { speechToText, ensureCompatibleFormat } = await import('./replit_integrations/audio/client');
       
       const rawBuffer = Buffer.from(audio, 'base64');
+      if (rawBuffer.length > MAX_AUDIO_SIZE) {
+        return res.status(400).json({ message: 'Audio file too large (max 10MB)' });
+      }
+      
       const { buffer: audioBuffer, format } = await ensureCompatibleFormat(rawBuffer);
       const transcript = await speechToText(audioBuffer, format);
+      
+      if (!transcript || transcript.trim() === '') {
+        return res.json({ transcript: '', message: 'No speech detected' });
+      }
       
       res.json({ transcript });
     } catch (error) {
       console.error('Transcription error:', error);
-      res.status(500).json({ message: 'Failed to transcribe audio' });
+      res.status(500).json({ message: 'Failed to transcribe audio. Please try again.' });
     }
   });
 
