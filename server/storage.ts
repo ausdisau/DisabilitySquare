@@ -20,6 +20,7 @@ import { authStorage } from "./replit_integrations/auth/storage";
 export interface IStorage {
   // Auth stuff (delegated or re-implemented if needed, but we use authStorage for that)
   getUser(id: string): Promise<User | undefined>;
+  makeUserAdmin(userId: string): Promise<void>;
   
   // Profile
   getProfile(userId: string): Promise<Profile | undefined>;
@@ -56,7 +57,12 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return authStorage.getUser(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+  
+  async makeUserAdmin(userId: string): Promise<void> {
+    await db.update(users).set({ isAdmin: true }).where(eq(users.id, userId));
   }
 
   async getProfile(userId: string): Promise<Profile | undefined> {

@@ -1,10 +1,27 @@
-import type { Express } from "express";
+import type { Express, Response, NextFunction } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { setupAuth0, registerAuth0Routes, isAuthenticated } from "./auth0";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { POINT_VALUES } from "@shared/schema";
+import { POINT_VALUES, EXTENSION_EVENTS, EXTENSION_PERMISSIONS } from "@shared/schema";
+import { extensionManager } from "./extensions";
+
+// Middleware to check if user is admin (persisted in database)
+const isAdmin = async (req: any, res: Response, next: NextFunction) => {
+  const userId = req.userId || req.oidc?.user?.sub;
+  
+  if (!userId) {
+    return res.status(403).json({ message: 'Admin access required' });
+  }
+  
+  const user = await storage.getUser(userId);
+  if (!user || !user.isAdmin) {
+    return res.status(403).json({ message: 'Admin access required' });
+  }
+  
+  next();
+};
 
 export async function registerRoutes(
   httpServer: Server,
@@ -71,6 +88,9 @@ export async function registerRoutes(
         description: `Created group: "${group.name}"`,
       });
       
+      // Emit extension event
+      await extensionManager.emit(EXTENSION_EVENTS.GROUP_CREATED, { group }, userId);
+      
       res.status(201).json(group);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -104,6 +124,9 @@ export async function registerRoutes(
         actionType: 'post_created',
         description: `Created post: "${post.title.substring(0, 50)}${post.title.length > 50 ? '...' : ''}"`,
       });
+      
+      // Emit extension event
+      await extensionManager.emit(EXTENSION_EVENTS.POST_CREATED, { post }, userId);
       
       res.status(201).json(post);
     } catch (error) {
@@ -162,6 +185,9 @@ export async function registerRoutes(
           relatedUserId: userId,
         });
       }
+      
+      // Emit extension event
+      await extensionManager.emit(EXTENSION_EVENTS.COMMENT_CREATED, { comment, post }, userId);
       
       res.status(201).json(comment);
     } catch (error) {
@@ -246,6 +272,100 @@ export async function registerRoutes(
     const limit = req.query.limit ? Number(req.query.limit) : 20;
     const achievements = await storage.getRecentAchievements(limit);
     res.json(achievements);
+  });
+
+  // === EXTENSION ROUTES ===
+
+  // Get all extensions
+  app.get(api.extensions.list.path, async (req, res) => {
+    const allExtensions = await extensionManager.getAllExtensions();
+    res.json(allExtensions);
+  });
+
+  // Get available event types
+  app.get(api.extensions.events.path, async (req, res) => {
+    res.json(Object.values(EXTENSION_EVENTS));
+  });
+
+  // Get available permissions
+  app.get(api.extensions.permissions.path, async (req, res) => {
+    res.json(Object.values(EXTENSION_PERMISSIONS));
+  });
+
+  // Get single extension
+  app.get(api.extensions.get.path, async (req, res) => {
+    const id = Number(req.params.id);
+    const ext = await extensionManager.getExtension(id);
+    if (!ext) {
+      return res.status(404).json({ message: 'Extension not found' });
+    }
+    res.json(ext);
+  });
+
+  // Install extension (admin only)
+  app.post(api.extensions.install.path, isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const parsed = api.extensions.install.input.parse(req.body);
+      const ext = await extensionManager.installExtension(parsed, parsed.entryPoint);
+      res.status(201).json(ext);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Enable extension (admin only)
+  app.post(api.extensions.enable.path, isAuthenticated, isAdmin, async (req: any, res) => {
+    const id = Number(req.params.id);
+    const ext = await extensionManager.getExtension(id);
+    if (!ext) {
+      return res.status(404).json({ message: 'Extension not found' });
+    }
+    await extensionManager.enableExtension(id);
+    res.json({ success: true });
+  });
+
+  // Disable extension (admin only)
+  app.post(api.extensions.disable.path, isAuthenticated, isAdmin, async (req: any, res) => {
+    const id = Number(req.params.id);
+    const ext = await extensionManager.getExtension(id);
+    if (!ext) {
+      return res.status(404).json({ message: 'Extension not found' });
+    }
+    await extensionManager.disableExtension(id);
+    res.json({ success: true });
+  });
+
+  // Uninstall extension (admin only)
+  app.delete(api.extensions.uninstall.path, isAuthenticated, isAdmin, async (req: any, res) => {
+    const id = Number(req.params.id);
+    const ext = await extensionManager.getExtension(id);
+    if (!ext) {
+      return res.status(404).json({ message: 'Extension not found' });
+    }
+    await extensionManager.uninstallExtension(id);
+    res.json({ success: true });
+  });
+
+  // Update extension config (admin only)
+  app.put(api.extensions.updateConfig.path, isAuthenticated, isAdmin, async (req: any, res) => {
+    const id = Number(req.params.id);
+    const ext = await extensionManager.getExtension(id);
+    if (!ext) {
+      return res.status(404).json({ message: 'Extension not found' });
+    }
+    await extensionManager.updateExtensionConfig(id, req.body);
+    res.json({ success: true });
+  });
+
+  // Get extension logs (admin only)
+  app.get(api.extensions.logs.path, isAuthenticated, isAdmin, async (req: any, res) => {
+    const id = Number(req.params.id);
+    const ext = await extensionManager.getExtension(id);
+    if (!ext) {
+      return res.status(404).json({ message: 'Extension not found' });
+    }
+    const logs = await extensionManager.getExtensionLogs(id);
+    res.json(logs);
   });
 
   return httpServer;

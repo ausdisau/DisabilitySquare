@@ -12,7 +12,8 @@ import {
   Eye, 
   Type,
   Trophy,
-  Star
+  Star,
+  Puzzle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +36,7 @@ export function Sidebar() {
     { href: "/groups", label: "Groups", icon: Users },
     { href: "/recognition", label: "Recognition", icon: Trophy },
     { href: "/games", label: "Games", icon: Gamepad2 },
+    { href: "/extensions", label: "Extensions", icon: Puzzle },
     { href: "/profile", label: "My Profile", icon: User },
   ];
 

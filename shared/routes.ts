@@ -6,7 +6,8 @@ import {
   insertCommentSchema, 
   insertGameScoreSchema,
   insertPointsLedgerSchema,
-  profiles, groups, posts, comments, gameScores, badges, userBadges, pointsLedger, userPoints
+  insertExtensionSchema,
+  profiles, groups, posts, comments, gameScores, badges, userBadges, pointsLedger, userPoints, extensions, extensionLogs
 } from './schema';
 
 export const errorSchemas = {
@@ -188,6 +189,92 @@ export const api = {
       path: '/api/valorization/achievements',
       responses: {
         200: z.array(z.custom<typeof pointsLedger.$inferSelect & { user: { firstName: string | null, lastName: string | null, profileImageUrl: string | null } }>()),
+      },
+    },
+  },
+  extensions: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/extensions',
+      responses: {
+        200: z.array(z.custom<typeof extensions.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/extensions/:id',
+      responses: {
+        200: z.custom<typeof extensions.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    install: {
+      method: 'POST' as const,
+      path: '/api/extensions',
+      input: insertExtensionSchema,
+      responses: {
+        201: z.custom<typeof extensions.$inferSelect>(),
+        401: errorSchemas.unauthorized,
+        400: errorSchemas.validation,
+      },
+    },
+    enable: {
+      method: 'POST' as const,
+      path: '/api/extensions/:id/enable',
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        401: errorSchemas.unauthorized,
+        404: errorSchemas.notFound,
+      },
+    },
+    disable: {
+      method: 'POST' as const,
+      path: '/api/extensions/:id/disable',
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        401: errorSchemas.unauthorized,
+        404: errorSchemas.notFound,
+      },
+    },
+    uninstall: {
+      method: 'DELETE' as const,
+      path: '/api/extensions/:id',
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        401: errorSchemas.unauthorized,
+        404: errorSchemas.notFound,
+      },
+    },
+    updateConfig: {
+      method: 'PUT' as const,
+      path: '/api/extensions/:id/config',
+      input: z.record(z.any()),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        401: errorSchemas.unauthorized,
+        404: errorSchemas.notFound,
+      },
+    },
+    logs: {
+      method: 'GET' as const,
+      path: '/api/extensions/:id/logs',
+      responses: {
+        200: z.array(z.custom<typeof extensionLogs.$inferSelect>()),
+        404: errorSchemas.notFound,
+      },
+    },
+    events: {
+      method: 'GET' as const,
+      path: '/api/extensions/events',
+      responses: {
+        200: z.array(z.string()),
+      },
+    },
+    permissions: {
+      method: 'GET' as const,
+      path: '/api/extensions/permissions',
+      responses: {
+        200: z.array(z.string()),
       },
     },
   },

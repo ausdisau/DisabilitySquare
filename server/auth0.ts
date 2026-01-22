@@ -62,13 +62,22 @@ export const isAuthenticated = async (req: Request, res: Response, next: NextFun
       const [existingUser] = await db.select().from(users).where(eq(users.id, auth0User.sub));
       
       if (!existingUser) {
+        // Check if this is the first user (make them admin)
+        const [anyUser] = await db.select().from(users).limit(1);
+        const isFirstUser = !anyUser;
+        
         await db.insert(users).values({
           id: auth0User.sub,
           email: auth0User.email || null,
           firstName: auth0User.given_name || auth0User.nickname || null,
           lastName: auth0User.family_name || null,
           profileImageUrl: auth0User.picture || null,
+          isAdmin: isFirstUser,
         });
+        
+        if (isFirstUser) {
+          console.log(`[Auth] First user ${auth0User.sub} registered as admin`);
+        }
       }
       
       // Attach user ID to request for easy access

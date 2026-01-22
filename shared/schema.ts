@@ -225,6 +225,114 @@ export const POINT_VALUES = {
   WELCOMED_NEWCOMER: 10,
 } as const;
 
+// === EXTENSION SYSTEM ===
+
+// Extension registry - stores installed extensions
+export const extensions = pgTable("extensions", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  description: text("description").notNull(),
+  version: text("version").notNull().default("1.0.0"),
+  author: text("author").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  config: jsonb("config").$type<Record<string, any>>().default({}),
+  hooks: jsonb("hooks").$type<string[]>().default([]), // Event hooks this extension subscribes to
+  permissions: jsonb("permissions").$type<string[]>().default([]), // Required permissions
+  entryPoint: text("entry_point").notNull(), // Path to extension module
+  installedAt: timestamp("installed_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Extension event hooks - tracks which extensions respond to which events
+export const extensionHooks = pgTable("extension_hooks", {
+  id: serial("id").primaryKey(),
+  extensionId: integer("extension_id").notNull().references(() => extensions.id),
+  eventType: text("event_type").notNull(), // 'post.created', 'comment.created', 'group.joined', etc.
+  priority: integer("priority").notNull().default(100), // Lower = runs first
+  enabled: boolean("enabled").notNull().default(true),
+});
+
+export const extensionHooksRelations = relations(extensionHooks, ({ one }) => ({
+  extension: one(extensions, {
+    fields: [extensionHooks.extensionId],
+    references: [extensions.id],
+  }),
+}));
+
+// Extension logs - for debugging and monitoring
+export const extensionLogs = pgTable("extension_logs", {
+  id: serial("id").primaryKey(),
+  extensionId: integer("extension_id").notNull().references(() => extensions.id),
+  level: text("level").notNull(), // 'info', 'warn', 'error'
+  message: text("message").notNull(),
+  metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const extensionLogsRelations = relations(extensionLogs, ({ one }) => ({
+  extension: one(extensions, {
+    fields: [extensionLogs.extensionId],
+    references: [extensions.id],
+  }),
+}));
+
+export const extensionsRelations = relations(extensions, ({ many }) => ({
+  hooks: many(extensionHooks),
+  logs: many(extensionLogs),
+}));
+
+// Platform event types that extensions can hook into
+export const EXTENSION_EVENTS = {
+  // User events
+  USER_REGISTERED: 'user.registered',
+  USER_PROFILE_UPDATED: 'user.profile_updated',
+  
+  // Post events
+  POST_CREATED: 'post.created',
+  POST_UPDATED: 'post.updated',
+  POST_DELETED: 'post.deleted',
+  POST_LIKED: 'post.liked',
+  
+  // Comment events
+  COMMENT_CREATED: 'comment.created',
+  COMMENT_DELETED: 'comment.deleted',
+  
+  // Group events
+  GROUP_CREATED: 'group.created',
+  GROUP_JOINED: 'group.joined',
+  GROUP_LEFT: 'group.left',
+  
+  // Valorization events
+  POINTS_AWARDED: 'points.awarded',
+  BADGE_EARNED: 'badge.earned',
+  LEVEL_UP: 'level.up',
+  
+  // Game events
+  GAME_SCORE_SAVED: 'game.score_saved',
+  
+  // Custom extension events
+  EXTENSION_INSTALLED: 'extension.installed',
+  EXTENSION_ENABLED: 'extension.enabled',
+  EXTENSION_DISABLED: 'extension.disabled',
+} as const;
+
+// Extension permissions
+export const EXTENSION_PERMISSIONS = {
+  READ_USERS: 'read:users',
+  WRITE_USERS: 'write:users',
+  READ_POSTS: 'read:posts',
+  WRITE_POSTS: 'write:posts',
+  READ_COMMENTS: 'read:comments',
+  WRITE_COMMENTS: 'write:comments',
+  READ_GROUPS: 'read:groups',
+  WRITE_GROUPS: 'write:groups',
+  READ_POINTS: 'read:points',
+  AWARD_POINTS: 'award:points',
+  AWARD_BADGES: 'award:badges',
+  SEND_NOTIFICATIONS: 'send:notifications',
+} as const;
+
 // === ZOD SCHEMAS ===
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, userId: true });
 export const insertGroupSchema = createInsertSchema(groups).omit({ id: true, createdById: true, createdAt: true });
@@ -257,3 +365,46 @@ export type PointsLedgerEntry = typeof pointsLedger.$inferSelect;
 export type InsertPointsLedgerEntry = z.infer<typeof insertPointsLedgerSchema>;
 export type UserPoints = typeof userPoints.$inferSelect;
 export type InsertUserPoints = z.infer<typeof insertUserPointsSchema>;
+
+// Extension types
+export const insertExtensionSchema = createInsertSchema(extensions).omit({ id: true, installedAt: true, updatedAt: true });
+export const insertExtensionHookSchema = createInsertSchema(extensionHooks).omit({ id: true });
+export const insertExtensionLogSchema = createInsertSchema(extensionLogs).omit({ id: true, createdAt: true });
+
+export type Extension = typeof extensions.$inferSelect;
+export type InsertExtension = z.infer<typeof insertExtensionSchema>;
+export type ExtensionHook = typeof extensionHooks.$inferSelect;
+export type InsertExtensionHook = z.infer<typeof insertExtensionHookSchema>;
+export type ExtensionLog = typeof extensionLogs.$inferSelect;
+export type InsertExtensionLog = z.infer<typeof insertExtensionLogSchema>;
+
+// Extension context passed to extension handlers
+export interface ExtensionContext {
+  extensionId: number;
+  storage: any; // Access to storage methods
+  log: (level: 'info' | 'warn' | 'error', message: string, metadata?: Record<string, any>) => Promise<void>;
+  awardPoints: (userId: string, points: number, actionType: string, description: string) => Promise<void>;
+  awardBadge: (userId: string, badgeId: number) => Promise<void>;
+  getConfig: () => Record<string, any>;
+  setConfig: (config: Record<string, any>) => Promise<void>;
+}
+
+// Extension event payload types
+export interface ExtensionEventPayload {
+  eventType: string;
+  timestamp: Date;
+  data: Record<string, any>;
+  userId?: string;
+}
+
+// Extension manifest for installation
+export interface ExtensionManifest {
+  name: string;
+  displayName: string;
+  description: string;
+  version: string;
+  author: string;
+  hooks: string[];
+  permissions: string[];
+  defaultConfig?: Record<string, any>;
+}

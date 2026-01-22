@@ -105,6 +105,33 @@ The platform uses a Social Role Valorization (SRV) model to reward genuine commu
 
 The app runs with `npm run dev` which starts both the Express backend and Vite frontend on port 5000.
 
+## Extension Framework
+
+The platform includes a flexible extension system for adding custom functionality:
+
+### Extension Structure
+Extensions are TypeScript modules in `server/extensions/` that export:
+- `manifest`: Metadata including name, version, hooks, and permissions
+- `handler`: Async function that responds to platform events
+
+### Available Event Hooks
+- User: `user.registered`, `user.profile_updated`
+- Posts: `post.created`, `post.updated`, `post.deleted`, `post.liked`
+- Comments: `comment.created`, `comment.deleted`
+- Groups: `group.created`, `group.joined`, `group.left`
+- Valorization: `points.awarded`, `badge.earned`, `level.up`
+- Games: `game.score_saved`
+- Extensions: `extension.installed`, `extension.enabled`, `extension.disabled`
+
+### Extension Context API
+- `context.log(level, message, metadata)` - Log for debugging
+- `context.awardPoints(userId, points, actionType, description)` - Award valorization points
+- `context.awardBadge(userId, badgeId)` - Award badges
+- `context.getConfig()` / `context.setConfig(config)` - Manage configuration
+
+### Sample Extension
+See `server/extensions/samples/welcome-extension.ts` for a working example.
+
 ## Recent Changes
 
 - Integrated Auth0 authentication
@@ -116,3 +143,9 @@ The app runs with `npm run dev` which starts both the Express backend and Vite f
 - Auto-badge awarding when users reach point thresholds
 - Sidebar displays user points and level
 - Profile page shows earned badges
+- Added Extension Framework for platform extensibility
+- Extensions page with documentation and management UI
+- Added admin role persistence (first user becomes admin, stored in database)
+- Extension management routes now require admin authorization
+- Hardened extension entry point validation with path resolution and symlink checks
+- ExtensionContext now uses storage methods for consistent valorization behavior

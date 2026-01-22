@@ -17,6 +17,7 @@ import GameChess from "@/pages/GameChess";
 import GameTetris from "@/pages/GameTetris";
 import Profile from "@/pages/Profile";
 import Recognition from "@/pages/Recognition";
+import Extensions from "@/pages/Extensions";
 import NotFound from "@/pages/not-found";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/games/chess" component={props => <PrivateRoute component={GameChess} {...props} />} />
       <Route path="/games/tetris" component={props => <PrivateRoute component={GameTetris} {...props} />} />
       <Route path="/recognition" component={props => <PrivateRoute component={Recognition} {...props} />} />
+      <Route path="/extensions" component={props => <PrivateRoute component={Extensions} {...props} />} />
       <Route path="/profile" component={props => <PrivateRoute component={Profile} {...props} />} />
       <Route component={NotFound} />
     </Switch>
