@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 import { SEO } from "@/components/SEO";
+import { LoginModal } from "@/components/LoginModal";
 
 export default function Landing() {
   const { isAuthenticated, isLoading } = useAuth();
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   if (isLoading) return null;
   if (isAuthenticated) return <Redirect to="/" />;
@@ -61,14 +64,18 @@ export default function Landing() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4">
-            <a href="/api/auth/login" data-testid="link-login">
-              <Button size="lg" data-testid="button-join-community">
-                Join the Community <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </a>
+            <Button 
+              size="lg" 
+              onClick={() => setShowLoginModal(true)}
+              data-testid="button-join-community"
+            >
+              Join the Community <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
           </div>
         </div>
       </div>
+
+      <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
 
       {/* Right: Hero Image/Visual */}
       <div className="hidden lg:block lg:w-1/2 bg-muted relative">
