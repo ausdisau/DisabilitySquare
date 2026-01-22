@@ -3,16 +3,21 @@ import { PostCard } from "@/components/PostCard";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Layout } from "@/components/Layout";
+import { SEO } from "@/components/SEO";
 
 export default function Home() {
   const { data: posts, isLoading } = usePosts();
 
   return (
     <Layout>
+      <SEO 
+        title="Village Square" 
+        description="See what's happening in your DisabilitySquare community. Share posts, connect with friends, and stay updated."
+      />
       <div className="max-w-3xl mx-auto space-y-8">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-4xl font-display font-bold text-primary mb-2">The Village Square</h1>
+            <h1 className="text-4xl font-display font-bold text-primary mb-2" data-testid="text-village-square-title">The Village Square</h1>
             <p className="text-lg text-muted-foreground">See what's happening in your community today.</p>
           </div>
           <CreatePostDialog />

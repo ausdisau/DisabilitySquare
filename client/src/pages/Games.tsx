@@ -5,13 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Gamepad2, Grid3X3, Trophy } from "lucide-react";
 import { useGameLeaderboard } from "@/hooks/use-games";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SEO } from "@/components/SEO";
 
 export default function Games() {
   return (
     <Layout>
+      <SEO 
+        title="Game Center" 
+        description="Play accessible games like Chess and Block Stacker. Relax, have fun, and challenge friends in the DisabilitySquare Game Center."
+      />
       <div className="space-y-8">
         <header>
-          <h1 className="text-4xl font-display font-bold text-primary mb-2">Game Center</h1>
+          <h1 className="text-4xl font-display font-bold text-primary mb-2" data-testid="text-game-center-title">Game Center</h1>
           <p className="text-lg text-muted-foreground">Relax, play, and challenge friends.</p>
         </header>
 
@@ -50,8 +55,9 @@ export default function Games() {
 }
 
 function GameCard({ title, description, icon: Icon, href, color }: any) {
+  const testId = title.toLowerCase().replace(/\s+/g, '-');
   return (
-    <Card className={`overflow-hidden border-2 border-transparent hover:border-primary transition-all hover:shadow-xl group`}>
+    <Card className={`overflow-hidden border-2 border-transparent hover:border-primary transition-all group`} data-testid={`card-game-${testId}`}>
       <div className={`h-40 ${color} flex items-center justify-center`}>
         <Icon className="h-20 w-20 text-primary/80 group-hover:scale-110 transition-transform duration-300" />
       </div>
@@ -61,7 +67,7 @@ function GameCard({ title, description, icon: Icon, href, color }: any) {
       <CardContent className="space-y-6">
         <p className="text-muted-foreground text-lg">{description}</p>
         <Link href={href}>
-          <Button size="lg" className="w-full text-lg">Play Now</Button>
+          <Button size="lg" className="w-full" data-testid={`button-play-${testId}`}>Play Now</Button>
         </Link>
       </CardContent>
     </Card>

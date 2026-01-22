@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ArrowRight } from "lucide-react";
+import { SEO } from "@/components/SEO";
 
 export default function Landing() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -10,7 +11,12 @@ export default function Landing() {
   if (isAuthenticated) return <Redirect to="/" />;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row">
+    <>
+      <SEO 
+        title="Welcome" 
+        description="DisabilitySquare - A specialized social platform fostering connection, support, and community for people with disabilities."
+      />
+      <div className="min-h-screen bg-background flex flex-col md:flex-row">
       {/* Left: Content */}
       <div className="flex-1 flex flex-col justify-center p-8 md:p-16 lg:p-24 relative overflow-hidden">
         {/* Decorative Background Elements */}
@@ -22,6 +28,7 @@ export default function Landing() {
               src="/logo.png" 
               alt="DisabilitySquare Logo" 
               className="h-20 w-auto"
+              data-testid="img-logo"
             />
           </div>
           
@@ -30,7 +37,7 @@ export default function Landing() {
             Welcome to the Village Square
           </div>
           
-          <h1 className="font-display text-5xl md:text-7xl text-primary font-bold mb-6 leading-tight">
+          <h1 className="font-display text-5xl md:text-7xl text-primary font-bold mb-6 leading-tight" data-testid="text-headline">
             Connect where you <br/>
             <span className="text-accent">belong.</span>
           </h1>
@@ -55,7 +62,7 @@ export default function Landing() {
 
           <div className="flex flex-col sm:flex-row gap-4">
             <a href="/api/auth/login" data-testid="link-login">
-              <Button size="lg" className="text-lg px-8 py-6 rounded-2xl shadow-xl shadow-primary/20 hover:shadow-2xl hover:scale-105 transition-all w-full sm:w-auto">
+              <Button size="lg" data-testid="button-join-community">
                 Join the Community <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </a>
@@ -78,5 +85,6 @@ export default function Landing() {
         </div>
       </div>
     </div>
+    </>
   );
 }

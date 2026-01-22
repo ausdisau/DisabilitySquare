@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useGroups, useCreateGroup } from "@/hooks/use-groups";
 import { Layout } from "@/components/Layout";
+import { SEO } from "@/components/SEO";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,10 +26,14 @@ export default function Groups() {
 
   return (
     <Layout>
+      <SEO 
+        title="Community Groups" 
+        description="Find your people. Join community groups based on shared interests, experiences, and diagnoses on DisabilitySquare."
+      />
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-4xl font-display font-bold text-primary mb-2">Community Groups</h1>
+            <h1 className="text-4xl font-display font-bold text-primary mb-2" data-testid="text-groups-title">Community Groups</h1>
             <p className="text-lg text-muted-foreground">Find your people based on shared interests and experiences.</p>
           </div>
           <CreateGroupDialog />
@@ -43,10 +48,11 @@ export default function Groups() {
               className="pl-10"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              data-testid="input-search-groups"
             />
           </div>
           <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="w-full sm:w-[200px]">
+            <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-category">
               <SelectValue placeholder="Filter by Category" />
             </SelectTrigger>
             <SelectContent>
@@ -122,7 +128,7 @@ function CreateGroupDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg" className="shadow-lg gap-2">
+        <Button size="lg" className="gap-2" data-testid="button-create-group">
           <Plus className="h-5 w-5" /> Create Group
         </Button>
       </DialogTrigger>
@@ -138,6 +144,7 @@ function CreateGroupDialog() {
               value={formData.name}
               onChange={e => setFormData({...formData, name: e.target.value})}
               placeholder="e.g. Wheelchair Basketball Fans"
+              data-testid="input-group-name"
             />
           </div>
           <div className="space-y-2">
@@ -164,10 +171,11 @@ function CreateGroupDialog() {
               onChange={e => setFormData({...formData, description: e.target.value})}
               placeholder="What is this group about?"
               className="resize-none h-32"
+              data-testid="input-group-description"
             />
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={createGroup.isPending} className="w-full">
+            <Button type="submit" disabled={createGroup.isPending} className="w-full" data-testid="button-submit-group">
               {createGroup.isPending ? <Loader2 className="animate-spin mr-2" /> : "Create Group"}
             </Button>
           </DialogFooter>

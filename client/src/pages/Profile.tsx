@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { useAuth } from "@/hooks/use-auth";
 import { useProfile, useUpdateProfile } from "@/hooks/use-profiles";
 import { Layout } from "@/components/Layout";
+import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,8 +56,12 @@ export default function Profile() {
 
   return (
     <Layout>
+      <SEO 
+        title="My Profile" 
+        description="Manage your DisabilitySquare profile. Update your bio, location, and community preferences."
+      />
       <div className="max-w-2xl mx-auto space-y-8">
-        <h1 className="text-4xl font-display font-bold text-primary">My Profile</h1>
+        <h1 className="text-4xl font-display font-bold text-primary" data-testid="text-profile-title">My Profile</h1>
         
         <div className="flex items-center gap-6 mb-8">
           <Avatar className="h-24 w-24 border-4 border-background shadow-xl">
@@ -83,6 +88,7 @@ export default function Profile() {
                   {...form.register("bio")} 
                   placeholder="Share a little about yourself..."
                   className="min-h-[100px]"
+                  data-testid="input-bio"
                 />
               </div>
               <div className="space-y-2">
@@ -90,6 +96,7 @@ export default function Profile() {
                 <Input 
                   {...form.register("location")} 
                   placeholder="City, Country"
+                  data-testid="input-location"
                 />
               </div>
             </CardContent>
@@ -105,13 +112,14 @@ export default function Profile() {
                 <Input 
                   {...form.register("diagnosis")} 
                   placeholder="Share if you'd like to connect with others with similar experiences"
+                  data-testid="input-diagnosis"
                 />
                 <p className="text-xs text-muted-foreground">This helps us recommend relevant groups.</p>
               </div>
             </CardContent>
           </Card>
 
-          <Button type="submit" size="lg" disabled={updateProfile.isPending} className="w-full">
+          <Button type="submit" size="lg" disabled={updateProfile.isPending} className="w-full" data-testid="button-save-profile">
             {updateProfile.isPending ? <Loader2 className="animate-spin mr-2"/> : <Save className="mr-2 h-4 w-4"/>}
             Save Changes
           </Button>
