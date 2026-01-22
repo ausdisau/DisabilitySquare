@@ -10,9 +10,10 @@ DisabilitySquare is a community-focused platform designed with accessibility as 
 
 - **Frontend**: React with Vite, TypeScript, TailwindCSS, shadcn/ui
 - **Backend**: Express.js with TypeScript
-- **Database**: PostgreSQL with Drizzle ORM
+- **Database**: Supabase PostgreSQL with Drizzle ORM (falls back to local DATABASE_URL if SUPABASE_DATABASE_URL not set)
 - **Authentication**: Auth0 (express-openid-connect)
 - **Routing**: wouter (frontend), Express routes (backend)
+- **AI/Accessibility**: OpenAI integration for voice-to-text transcription
 
 ## Brand Colors
 
