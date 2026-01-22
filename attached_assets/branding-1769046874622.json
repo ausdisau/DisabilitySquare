@@ -1,0 +1,109 @@
+{
+  "colorScheme": "light",
+  "fonts": [
+    {
+      "family": "Lato",
+      "count": 69
+    },
+    {
+      "family": "sans-serif",
+      "count": 20
+    },
+    {
+      "family": "Poppins",
+      "count": 12
+    },
+    {
+      "family": "Roboto",
+      "count": 3
+    },
+    {
+      "family": "Arial",
+      "count": 3
+    },
+    {
+      "family": "Baskerville",
+      "count": 3
+    },
+    {
+      "family": "monospace",
+      "count": 3
+    }
+  ],
+  "colors": {
+    "primary": "#CF3F97",
+    "accent": "#1E2132",
+    "background": "#F8F7F9",
+    "textPrimary": "#939597",
+    "link": "#1E2132"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "Lato",
+      "heading": "Poppins"
+    },
+    "fontStacks": {
+      "body": [
+        "Lato"
+      ],
+      "heading": [
+        "Poppins",
+        "sans-serif"
+      ],
+      "paragraph": [
+        "Lato",
+        "sans-serif"
+      ]
+    },
+    "fontSizes": {
+      "h1": "34px",
+      "h2": "24px",
+      "body": "16px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 4,
+    "borderRadius": "4px"
+  },
+  "components": {
+    "input": {
+      "background": "#F2F4F5",
+      "textColor": "#1E2132",
+      "borderColor": null,
+      "borderRadius": "6px",
+      "borderRadiusCorners": {
+        "topLeft": "6px",
+        "topRight": "6px",
+        "bottomRight": "6px",
+        "bottomLeft": "6px"
+      },
+      "shadow": "none"
+    }
+  },
+  "images": {
+    "logo": null,
+    "favicon": "https://disabilityclubcommunity.com/wp-content/uploads/2023/12/cropped-Disability-Club-Favicon-32x32.png",
+    "ogImage": "https://disabilityclubcommunity.com/wp-content/uploads/2024/03/private-and-public-groups.jpg"
+  },
+  "__framework_hints": [
+    "Site Kit by Google 1.166.0"
+  ],
+  "__llm_button_reasoning": {
+    "primary": {
+      "index": -1,
+      "text": "N/A",
+      "reasoning": "LLM failed"
+    },
+    "secondary": {
+      "index": -1,
+      "text": "N/A",
+      "reasoning": "LLM failed"
+    },
+    "confidence": 0
+  },
+  "confidence": {
+    "buttons": 0,
+    "colors": 0,
+    "overall": 0
+  }
+}
