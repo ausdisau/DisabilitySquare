@@ -32,22 +32,25 @@ export function KeyboardShortcuts() {
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [, setLocation] = useLocation();
 
-  const isInteractiveElement = (element: EventTarget | null): boolean => {
+  const isTextInputElement = (element: EventTarget | null): boolean => {
     if (!element || !(element instanceof HTMLElement)) return false;
     
     const tagName = element.tagName.toLowerCase();
-    const interactiveTags = ['input', 'textarea', 'select', 'button', 'a'];
-    
-    if (interactiveTags.includes(tagName)) return true;
+    if (tagName === 'textarea') return true;
+    if (tagName === 'select') return true;
+    if (tagName === 'input') {
+      const type = (element as HTMLInputElement).type;
+      const textTypes = ['text', 'email', 'password', 'search', 'tel', 'url', 'number'];
+      return textTypes.includes(type);
+    }
     if (element.isContentEditable) return true;
     if (element.getAttribute('role') === 'textbox') return true;
-    if (element.getAttribute('role') === 'button') return true;
     
     return false;
   };
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (isInteractiveElement(e.target)) {
+    if (isTextInputElement(e.target)) {
       if (e.key === "Escape") {
         setOpen(false);
         setPendingKey(null);
