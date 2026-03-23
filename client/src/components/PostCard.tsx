@@ -2,13 +2,14 @@ import { type Post } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, ThumbsUp, Volume2 } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { useCreateComment } from "@/hooks/use-posts";
 import { Input } from "@/components/ui/input";
 import { ReportUserButton } from "@/components/ReportUserButton";
 import { TextToSpeech } from "@/components/TextToSpeech";
 import { useAuth } from "@/hooks/use-auth";
+import { PostReactions } from "@/components/PostReactions";
 
 type PostWithAuthor = Post & {
   author: {
@@ -78,14 +79,7 @@ export function PostCard({ post }: { post: PostWithAuthor }) {
 
       {/* Post footer — actions */}
       <div className="retro-post-footer">
-        <button
-          className="flex items-center gap-1 text-[#1B4B8A] hover:text-[#E07830] transition-colors"
-          data-testid={`button-like-${post.id}`}
-          aria-label={`${post.likesCount || 0} likes`}
-        >
-          <ThumbsUp className="h-3.5 w-3.5" />
-          <span>{post.likesCount || 0} Like{post.likesCount !== 1 ? "s" : ""}</span>
-        </button>
+        <PostReactions postId={post.id} compact />
 
         <button
           className="flex items-center gap-1 text-[#1B4B8A] hover:text-[#E07830] transition-colors"

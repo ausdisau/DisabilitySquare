@@ -20,6 +20,12 @@ export const profiles = pgTable("profiles", {
   dateOfBirth: timestamp("date_of_birth"),
   ageVerified: boolean("age_verified").default(false),
   ageVerifiedAt: timestamp("age_verified_at"),
+  // Health story prompts (inspired by The Mighty's community engagement model)
+  healthPrompts: jsonb("health_prompts").$type<{
+    wishPeopleKnew?: string;
+    goodDayLooksLike?: string;
+    supportLooksLike?: string;
+  }>().default({}),
 });
 
 export const profilesRelations = relations(profiles, ({ one }) => ({
@@ -128,6 +134,27 @@ export const commentsRelations = relations(comments, ({ one }) => ({
     references: [posts.id],
   }),
 }));
+
+// === POST REACTIONS ===
+// Empathetic reactions inspired by The Mighty (hug, me_too, helpful, inspiring)
+export const postReactions = pgTable("post_reactions", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  reactionType: text("reaction_type").notNull(), // 'hug' | 'me_too' | 'helpful' | 'inspiring'
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniqueUserPost: unique().on(table.postId, table.userId),
+}));
+
+export const postReactionsRelations = relations(postReactions, ({ one }) => ({
+  post: one(posts, { fields: [postReactions.postId], references: [posts.id] }),
+  user: one(users, { fields: [postReactions.userId], references: [users.id] }),
+}));
+
+export const insertPostReactionSchema = createInsertSchema(postReactions).omit({ id: true, createdAt: true });
+export type PostReaction = typeof postReactions.$inferSelect;
+export type InsertPostReaction = typeof insertPostReactionSchema._type;
 
 // === GAME SCORES ===
 export const gameScores = pgTable("game_scores", {

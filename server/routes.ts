@@ -143,6 +143,67 @@ export async function registerRoutes(
     res.json(post);
   });
 
+  // === REACTIONS ===
+  // POST /api/posts/:id/react — add or switch reaction (hug, me_too, helpful, inspiring)
+  app.post('/api/posts/:id/react', isAuthenticated, async (req: any, res) => {
+    const postId = Number(req.params.id);
+    const userId = req.userId || req.oidc?.user?.sub;
+    const { reactionType } = req.body;
+    const validTypes = ['hug', 'me_too', 'helpful', 'inspiring'];
+    if (!validTypes.includes(reactionType)) {
+      return res.status(400).json({ message: 'Invalid reaction type' });
+    }
+    const reaction = await storage.addReaction(postId, userId, reactionType);
+    res.json(reaction);
+  });
+
+  // DELETE /api/posts/:id/react — remove reaction
+  app.delete('/api/posts/:id/react', isAuthenticated, async (req: any, res) => {
+    const postId = Number(req.params.id);
+    const userId = req.userId || req.oidc?.user?.sub;
+    await storage.removeReaction(postId, userId);
+    res.json({ success: true });
+  });
+
+  // GET /api/posts/:id/reactions — get reaction counts and current user's reaction
+  app.get('/api/posts/:id/reactions', async (req: any, res) => {
+    const postId = Number(req.params.id);
+    const userId = req.userId || req.oidc?.user?.sub;
+    const counts = await storage.getReactionCounts(postId);
+    const userReaction = userId ? await storage.getUserReaction(postId, userId) : undefined;
+    res.json({ counts, userReaction: userReaction?.reactionType || null });
+  });
+
+  // POST /api/reactions/bulk — get reaction counts for multiple posts
+  app.post('/api/reactions/bulk', async (req: any, res) => {
+    const { postIds, userId } = req.body;
+    if (!Array.isArray(postIds)) return res.status(400).json({ message: 'postIds must be an array' });
+    const counts = await storage.getReactionCountsBulk(postIds);
+    const userReactions: Record<number, string | null> = {};
+    if (userId) {
+      for (const postId of postIds) {
+        const r = await storage.getUserReaction(postId, userId);
+        userReactions[postId] = r?.reactionType || null;
+      }
+    }
+    res.json({ counts, userReactions });
+  });
+
+  // === PEER CONNECT ===
+  // GET /api/connect/matches — find members with matching diagnosis or interests
+  app.get('/api/connect/matches', isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    const limit = Math.min(Number(req.query.limit) || 20, 50);
+    const matches = await storage.getPeerMatches(userId, limit);
+    res.json(matches);
+  });
+
+  // GET /api/connect/members — list all members (for browse view)
+  app.get('/api/connect/members', async (req, res) => {
+    const members = await storage.listAllProfiles();
+    res.json(members);
+  });
+
   // === COMMENTS ===
   app.post(api.comments.create.path, isAuthenticated, async (req: any, res) => {
     try {

@@ -3,11 +3,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMyPoints } from "@/hooks/use-valorization";
 import {
   Home, Users, Gamepad2, User, Trophy, Puzzle,
-  Spline, BookOpen, Building2, BookMarked, Briefcase, Bus, Star,
+  Spline, BookOpen, Building2, BookMarked, Briefcase, Bus, Star, HeartHandshake,
 } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Village Square", icon: Home },
+  { href: "/connect", label: "Peer Connect", icon: HeartHandshake },
   { href: "/groups", label: "Groups", icon: Users },
   { href: "/spoons", label: "Spoon Tracker", icon: Spline },
   { href: "/journal", label: "Health Journal", icon: BookOpen },

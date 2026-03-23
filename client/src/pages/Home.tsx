@@ -4,6 +4,7 @@ import { PostCard } from "@/components/PostCard";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Layout } from "@/components/Layout";
 import { SEO } from "@/components/SEO";
+import { WellnessCheckIn } from "@/components/WellnessCheckIn";
 import { Clock, Users, MessageSquare, Star, RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -130,6 +131,9 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Daily wellness check-in */}
+      <WellnessCheckIn />
 
       {/* 2-column layout: feed + right sidebar */}
       <div className="flex gap-3">

@@ -1,10 +1,11 @@
 import { db } from "./db";
-import { eq, desc, and, sql, sum, gte, lte, lt } from "drizzle-orm";
+import { eq, desc, and, sql, sum, gte, lte, lt, inArray, ne } from "drizzle-orm";
 import { 
   users, profiles, groups, posts, comments, gameScores, groupMembers,
   badges, userBadges, pointsLedger, userPoints, userReports,
   spoonStatus, journalEntries, serviceProviders, resources, savedResources, jobListings,
   transportProviders, transportVehicles, tripQuotes, trips,
+  postReactions,
   type User, type InsertUser,
   type Profile, type InsertProfile,
   type Group, type InsertGroup,
@@ -25,6 +26,7 @@ import {
   type TransportVehicle, type InsertTransportVehicle,
   type TripQuote, type InsertTripQuote,
   type Trip, type InsertTrip,
+  type PostReaction,
   POINT_VALUES
 } from "@shared/schema";
 
@@ -99,6 +101,17 @@ export interface IStorage {
   getJobListing(id: number): Promise<JobListing | undefined>;
   createJobListing(data: InsertJobListing, postedById: string): Promise<JobListing>;
   approveJobListing(id: number): Promise<void>;
+
+  // Reactions (empathetic reactions: hug, me_too, helpful, inspiring)
+  addReaction(postId: number, userId: string, reactionType: string): Promise<PostReaction>;
+  removeReaction(postId: number, userId: string): Promise<void>;
+  getReactionCounts(postId: number): Promise<Record<string, number>>;
+  getUserReaction(postId: number, userId: string): Promise<PostReaction | undefined>;
+  getReactionCountsBulk(postIds: number[]): Promise<Record<number, Record<string, number>>>;
+
+  // Peer Connect — find users with matching diagnosis or interests
+  getPeerMatches(userId: string, limit?: number): Promise<(User & { profile: Profile | null })[]>;
+  listAllProfiles(): Promise<(User & { profile: Profile | null })[]>;
 
   // Transport Module
   seedTransportProviders(): Promise<void>;
@@ -675,6 +688,95 @@ export class DatabaseStorage implements IStorage {
       .where(eq(trips.id, id))
       .returning();
     return updated;
+  }
+
+  // === REACTIONS ===
+  async addReaction(postId: number, userId: string, reactionType: string): Promise<PostReaction> {
+    const [reaction] = await db
+      .insert(postReactions)
+      .values({ postId, userId, reactionType })
+      .onConflictDoUpdate({
+        target: [postReactions.postId, postReactions.userId],
+        set: { reactionType },
+      })
+      .returning();
+    return reaction;
+  }
+
+  async removeReaction(postId: number, userId: string): Promise<void> {
+    await db.delete(postReactions)
+      .where(and(eq(postReactions.postId, postId), eq(postReactions.userId, userId)));
+  }
+
+  async getReactionCounts(postId: number): Promise<Record<string, number>> {
+    const rows = await db
+      .select({ reactionType: postReactions.reactionType, count: sql<number>`count(*)::int` })
+      .from(postReactions)
+      .where(eq(postReactions.postId, postId))
+      .groupBy(postReactions.reactionType);
+    const counts: Record<string, number> = {};
+    for (const row of rows) counts[row.reactionType] = row.count;
+    return counts;
+  }
+
+  async getUserReaction(postId: number, userId: string): Promise<PostReaction | undefined> {
+    const [reaction] = await db
+      .select()
+      .from(postReactions)
+      .where(and(eq(postReactions.postId, postId), eq(postReactions.userId, userId)));
+    return reaction;
+  }
+
+  async getReactionCountsBulk(postIds: number[]): Promise<Record<number, Record<string, number>>> {
+    if (postIds.length === 0) return {};
+    const rows = await db
+      .select({ postId: postReactions.postId, reactionType: postReactions.reactionType, count: sql<number>`count(*)::int` })
+      .from(postReactions)
+      .where(inArray(postReactions.postId, postIds))
+      .groupBy(postReactions.postId, postReactions.reactionType);
+    const result: Record<number, Record<string, number>> = {};
+    for (const row of rows) {
+      if (!result[row.postId]) result[row.postId] = {};
+      result[row.postId][row.reactionType] = row.count;
+    }
+    return result;
+  }
+
+  // === PEER CONNECT ===
+  async getPeerMatches(userId: string, limit = 20): Promise<(User & { profile: Profile | null })[]> {
+    const myProfile = await this.getProfile(userId);
+    const myDiagnosis = myProfile?.diagnosis?.toLowerCase() || "";
+    const myInterests: string[] = (myProfile?.interests as string[]) || [];
+
+    const allUsers = await db.query.users.findMany({
+      where: ne(users.id, userId),
+      with: { profile: true },
+      limit: 200,
+    });
+
+    const scored = (allUsers as any[]).map((u: any) => {
+      const profile = u.profile;
+      let score = 0;
+      if (profile?.diagnosis && myDiagnosis && profile.diagnosis.toLowerCase().includes(myDiagnosis)) score += 3;
+      if (profile?.diagnosis && myDiagnosis && myDiagnosis.includes(profile.diagnosis.toLowerCase())) score += 3;
+      const theirInterests: string[] = (profile?.interests as string[]) || [];
+      const shared = theirInterests.filter((i: string) => myInterests.includes(i));
+      score += shared.length;
+      if (profile?.location && myProfile?.location && profile.location === myProfile.location) score += 1;
+      return { ...u, _score: score };
+    });
+
+    return scored
+      .sort((a: any, b: any) => b._score - a._score)
+      .slice(0, limit)
+      .map(({ _score, ...u }: any) => u);
+  }
+
+  async listAllProfiles(): Promise<(User & { profile: Profile | null })[]> {
+    return await db.query.users.findMany({
+      with: { profile: true },
+      limit: 100,
+    }) as any;
   }
 }
 

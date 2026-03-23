@@ -26,6 +26,7 @@ import ServiceDirectory from "@/pages/ServiceDirectory";
 import Resources from "@/pages/Resources";
 import JobBoard from "@/pages/JobBoard";
 import Transport from "@/pages/Transport";
+import Connect from "@/pages/Connect";
 import NotFound from "@/pages/not-found";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
@@ -84,6 +85,7 @@ function Router() {
       <Route path="/resources" component={props => <PrivateRoute component={Resources} {...props} />} />
       <Route path="/jobs" component={props => <PrivateRoute component={JobBoard} {...props} />} />
       <Route path="/transport" component={Transport} />
+      <Route path="/connect" component={props => <PrivateRoute component={Connect} {...props} />} />
       <Route component={NotFound} />
     </Switch>
   );

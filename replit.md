@@ -211,6 +211,48 @@ Two providers auto-seeded on server startup near Sydney CBD:
 ### Google Maps Configuration
 Set `GOOGLE_MAPS_API_KEY` environment variable to enable real routing. Falls back to haversine distance estimation.
 
+## Patient Support Network Features
+
+DisabilitySquare is positioned as a patient support network comparable to The Mighty, BioNews, Spoony, and SuperHue, with Australian-specific differentiators.
+
+### Empathetic Reactions System
+Replaces/augments the simple Like button with 4 empathetic reaction types (inspired by The Mighty):
+- 🤗 **Hug** — emotional validation
+- ✋ **Me Too** — shared experience
+- 💡 **Helpful** — practical value
+- ✨ **Inspiring** — uplifting content
+
+API: `POST /api/posts/:id/react`, `DELETE /api/posts/:id/react`, `GET /api/posts/:id/reactions`, `POST /api/reactions/bulk`
+Table: `post_reactions` (unique per user per post)
+Component: `client/src/components/PostReactions.tsx`
+
+### Health Story Prompts
+Profile prompts inspired by The Mighty's community engagement model:
+- "What I wish people knew about my condition"
+- "My good day looks like"
+- "Support looks like"
+
+Stored as `healthPrompts` JSONB column in `profiles` table. Shown on member cards in /connect.
+
+### Peer Connect (`/connect`)
+Diagnosis-based peer matching inspired by Spoony's matching system. Matches users by:
+1. Shared diagnosis (weighted highest)
+2. Common interests
+3. Same location
+
+API: `GET /api/connect/matches` (scored matches), `GET /api/connect/members` (browse all)
+Page: `client/src/pages/Connect.tsx`
+
+### Daily Wellness Check-In
+Quick mood check-in (1-5 emoji scale) stored via the existing journal API. Shows check-in streak.
+Component: `client/src/components/WellnessCheckIn.tsx`
+
+### Australian Differentiators
+- Data hosted in AU (Supabase)
+- NDIS-aware transport and service directory
+- eSafety compliance (16+ age gate, content moderation)
+- Australian service providers seeded
+
 ## Recent Changes
 
 - Integrated Auth0 authentication

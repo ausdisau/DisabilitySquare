@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Star, Award, Trophy, Users, GraduationCap, Megaphone, HandHeart, UserPlus } from "lucide-react";
+import { Loader2, Save, Star, Award, Trophy, Users, GraduationCap, Megaphone, HandHeart, UserPlus, Heart, MessageSquare } from "lucide-react";
 
 const iconMap: Record<string, any> = {
   Trophy,
@@ -39,16 +39,27 @@ export default function Profile() {
     defaultValues: {
       bio: "",
       location: "",
-      diagnosis: ""
+      diagnosis: "",
+      healthPrompts: {
+        wishPeopleKnew: "",
+        goodDayLooksLike: "",
+        supportLooksLike: "",
+      }
     }
   });
 
   useEffect(() => {
     if (profile) {
+      const prompts = (profile as any).healthPrompts || {};
       form.reset({
         bio: profile.bio || "",
         location: profile.location || "",
-        diagnosis: profile.diagnosis || ""
+        diagnosis: profile.diagnosis || "",
+        healthPrompts: {
+          wishPeopleKnew: prompts.wishPeopleKnew || "",
+          goodDayLooksLike: prompts.goodDayLooksLike || "",
+          supportLooksLike: prompts.supportLooksLike || "",
+        }
       });
     }
   }, [profile, form]);
@@ -73,7 +84,7 @@ export default function Profile() {
     <Layout>
       <SEO 
         title="My Profile" 
-        description="Manage your DisabilitySquare profile. Update your bio, location, and community preferences."
+        description="Manage your DisabilitySquare profile. Update your bio, location, health story, and community preferences."
       />
       <div className="max-w-2xl mx-auto space-y-8">
         <h1 className="text-4xl font-display font-bold text-primary" data-testid="text-profile-title">My Profile</h1>
@@ -185,7 +196,66 @@ export default function Profile() {
                   placeholder="Share if you'd like to connect with others with similar experiences"
                   data-testid="input-diagnosis"
                 />
-                <p className="text-xs text-muted-foreground">This helps us recommend relevant groups.</p>
+                <p className="text-xs text-muted-foreground">This helps us recommend relevant groups and peer matches.</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Health Story Prompts — inspired by The Mighty's community model */}
+          <Card className="border-[#2A9D8F]/20 bg-gradient-to-b from-[#2A9D8F]/3 to-transparent">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Heart className="h-5 w-5 text-[#E07830]" />
+                My Health Story
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                These prompts help others understand your experience. They appear on your profile card in the Connect section.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <span className="text-base">💬</span>
+                  What I wish people knew about my condition
+                </Label>
+                <Textarea
+                  {...form.register("healthPrompts.wishPeopleKnew")}
+                  placeholder="The thing most people don't understand is..."
+                  className="min-h-[80px] resize-none"
+                  data-testid="input-wish-people-knew"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <span className="text-base">☀️</span>
+                  My good day looks like
+                </Label>
+                <Textarea
+                  {...form.register("healthPrompts.goodDayLooksLike")}
+                  placeholder="On a good day, I can..."
+                  className="min-h-[80px] resize-none"
+                  data-testid="input-good-day"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <span className="text-base">🤝</span>
+                  Support looks like
+                </Label>
+                <Textarea
+                  {...form.register("healthPrompts.supportLooksLike")}
+                  placeholder="The best way someone can support me is..."
+                  className="min-h-[80px] resize-none"
+                  data-testid="input-support-looks-like"
+                />
+              </div>
+
+              <div className="rounded-lg bg-amber-50 border border-amber-100 p-3">
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  <span className="font-semibold">🔒 Your choice:</span> These prompts are visible to other members in the Connect section. Leave them blank if you'd prefer to keep them private. Only your diagnosis and location affect peer matching.
+                </p>
               </div>
             </CardContent>
           </Card>
