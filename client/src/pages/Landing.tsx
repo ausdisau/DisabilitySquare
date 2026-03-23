@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { Redirect } from "wouter";
+import { Redirect, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ArrowRight } from "lucide-react";
 import { SEO } from "@/components/SEO";
@@ -103,6 +103,22 @@ export default function Landing() {
       aria-atomic="true" 
       className="sr-only"
     />
+
+    {/* Footer */}
+    <footer className="w-full border-t border-border bg-background py-3 px-6">
+      <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
+        <Link href="/safety">
+          <span className="hover:text-primary underline cursor-pointer" data-testid="link-landing-footer-safety">Safety Centre</span>
+        </Link>
+        <Link href="/terms">
+          <span className="hover:text-primary underline cursor-pointer" data-testid="link-landing-footer-terms">Terms of Service</span>
+        </Link>
+        <Link href="/privacy">
+          <span className="hover:text-primary underline cursor-pointer" data-testid="link-landing-footer-privacy">Privacy Policy</span>
+        </Link>
+        <span>🇦🇺 Australian eSafety compliant · 16+ · WCAG AAA</span>
+      </div>
+    </footer>
     </>
   );
 }

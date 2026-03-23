@@ -19,7 +19,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Flag, MoreHorizontal, AlertTriangle, Loader2, Check } from "lucide-react";
+import { Link } from "wouter";
+import { Flag, MoreHorizontal, AlertTriangle, Loader2, Check, Shield, ExternalLink } from "lucide-react";
 
 interface ReportUserButtonProps {
   userId: string;
@@ -39,6 +40,7 @@ export function ReportUserButton({ userId, userName, variant = "icon" }: ReportU
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedType, setSelectedType] = useState<string>("");
   const [reason, setReason] = useState("");
+  const [submitted, setSubmitted] = useState(false);
   const { toast } = useToast();
 
   const { data: hasReported } = useQuery({
@@ -57,11 +59,7 @@ export function ReportUserButton({ userId, userName, variant = "icon" }: ReportU
       return res.json() as Promise<{ success: boolean }>;
     },
     onSuccess: () => {
-      toast({ 
-        title: "Report Submitted", 
-        description: "Thank you for helping keep DisabilitySquare safe. We will review your report." 
-      });
-      setDialogOpen(false);
+      setSubmitted(true);
       setSelectedType("");
       setReason("");
       queryClient.invalidateQueries({ queryKey: ["/api/reports/check", userId] });
@@ -89,8 +87,62 @@ export function ReportUserButton({ userId, userName, variant = "icon" }: ReportU
 
   const openReportDialog = (type: string) => {
     setSelectedType(type);
+    setSubmitted(false);
     setDialogOpen(true);
   };
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
+    setSubmitted(false);
+    setSelectedType("");
+    setReason("");
+  };
+
+  const ReportConfirmation = () => (
+    <div className="space-y-4 py-2">
+      <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-md">
+        <Check className="h-5 w-5 text-green-600 shrink-0" aria-hidden="true" />
+        <div>
+          <p className="font-medium text-sm text-green-800">Report submitted</p>
+          <p className="text-xs text-green-700">Thank you for helping keep DisabilitySquare safe. Our team will review your report.</p>
+        </div>
+      </div>
+      <div className="border border-[#c8d0dc] rounded-sm p-3 space-y-2">
+        <p className="text-xs font-bold text-[#1B4B8A] flex items-center gap-1">
+          <Shield className="h-3 w-3" aria-hidden="true" />
+          Additional resources
+        </p>
+        <div className="flex flex-col gap-1">
+          <Link href="/safety" onClick={handleCloseDialog}>
+            <span className="text-xs text-[#1B4B8A] underline cursor-pointer flex items-center gap-1" data-testid="link-report-safety-centre">
+              <Shield className="h-3 w-3" aria-hidden="true" />
+              Safety Centre
+            </span>
+          </Link>
+          <a
+            href="https://www.esafety.gov.au/report/cyberbullying"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-[#1B4B8A] underline flex items-center gap-1"
+            data-testid="link-report-esafety-cyberbullying"
+          >
+            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            eSafety Cyberbullying Complaint
+          </a>
+          <a
+            href="https://www.esafety.gov.au/report/adult-cyber-abuse"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-[#1B4B8A] underline flex items-center gap-1"
+            data-testid="link-report-esafety-adult"
+          >
+            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            eSafety Adult Cyber Abuse Complaint
+          </a>
+        </div>
+      </div>
+    </div>
+  );
 
   if (variant === "dropdown") {
     return (
@@ -117,18 +169,153 @@ export function ReportUserButton({ userId, userName, variant = "icon" }: ReportU
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={handleCloseDialog}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Flag className="h-5 w-5 text-destructive" />
                 Report {userName || "User"}
               </DialogTitle>
+              {!submitted && (
+                <DialogDescription>
+                  Help us maintain a safe community by reporting policy violations.
+                </DialogDescription>
+              )}
+            </DialogHeader>
+
+            {submitted ? (
+              <ReportConfirmation />
+            ) : (
+              <div className="space-y-4 py-4">
+                {!selectedType && (
+                  <div className="space-y-2">
+                    <Label>Select Report Type</Label>
+                    <div className="grid gap-2">
+                      {REPORT_TYPES.map((type) => (
+                        <Button
+                          key={type.value}
+                          variant="outline"
+                          className="justify-start h-auto py-3 px-4"
+                          onClick={() => setSelectedType(type.value)}
+                          data-testid={`button-select-report-${type.value}`}
+                        >
+                          <div className="text-left">
+                            <div className="font-medium">{type.label}</div>
+                            <div className="text-xs text-muted-foreground">{type.description}</div>
+                          </div>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedType && (
+                  <>
+                    <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-md">
+                      <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-sm">
+                          {REPORT_TYPES.find(t => t.value === selectedType)?.label}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {REPORT_TYPES.find(t => t.value === selectedType)?.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="reason">Additional Details (Optional)</Label>
+                      <Textarea
+                        id="reason"
+                        placeholder="Provide any additional information that might help our review..."
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        className="min-h-[100px]"
+                        data-testid="input-report-reason"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            <DialogFooter>
+              {submitted ? (
+                <Button variant="outline" onClick={handleCloseDialog} data-testid="button-close-report">
+                  Close
+                </Button>
+              ) : (
+                <>
+                  {selectedType && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => setSelectedType("")}
+                      disabled={reportMutation.isPending}
+                    >
+                      Back
+                    </Button>
+                  )}
+                  <Button
+                    variant="destructive"
+                    onClick={handleSubmitReport}
+                    disabled={!selectedType || reportMutation.isPending}
+                    data-testid="button-submit-report"
+                  >
+                    {reportMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Flag className="h-4 w-4 mr-2" />
+                        Submit Report
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => openReportDialog("")}
+        className="text-muted-foreground hover:text-destructive"
+        title="Report user"
+        data-testid={`button-report-${userId}`}
+      >
+        {hasReported?.hasReported ? (
+          <Check className="h-4 w-4 text-muted-foreground" />
+        ) : (
+          <Flag className="h-4 w-4" />
+        )}
+      </Button>
+
+      <Dialog open={dialogOpen} onOpenChange={handleCloseDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Flag className="h-5 w-5 text-destructive" />
+              Report {userName || "User"}
+            </DialogTitle>
+            {!submitted && (
               <DialogDescription>
                 Help us maintain a safe community by reporting policy violations.
               </DialogDescription>
-            </DialogHeader>
+            )}
+          </DialogHeader>
 
+          {submitted ? (
+            <ReportConfirmation />
+          ) : (
             <div className="space-y-4 py-4">
               {!selectedType && (
                 <div className="space-y-2">
@@ -167,9 +354,9 @@ export function ReportUserButton({ userId, userName, variant = "icon" }: ReportU
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="reason">Additional Details (Optional)</Label>
+                    <Label htmlFor="reason2">Additional Details (Optional)</Label>
                     <Textarea
-                      id="reason"
+                      id="reason2"
                       placeholder="Provide any additional information that might help our review..."
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
@@ -180,151 +367,44 @@ export function ReportUserButton({ userId, userName, variant = "icon" }: ReportU
                 </>
               )}
             </div>
-
-            <DialogFooter>
-              {selectedType && (
-                <Button
-                  variant="ghost"
-                  onClick={() => setSelectedType("")}
-                  disabled={reportMutation.isPending}
-                >
-                  Back
-                </Button>
-              )}
-              <Button
-                variant="destructive"
-                onClick={handleSubmitReport}
-                disabled={!selectedType || reportMutation.isPending}
-                data-testid="button-submit-report"
-              >
-                {reportMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Flag className="h-4 w-4 mr-2" />
-                    Submit Report
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => openReportDialog("")}
-        className="text-muted-foreground hover:text-destructive"
-        title="Report user"
-        data-testid={`button-report-${userId}`}
-      >
-        {hasReported?.hasReported ? (
-          <Check className="h-4 w-4 text-muted-foreground" />
-        ) : (
-          <Flag className="h-4 w-4" />
-        )}
-      </Button>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Flag className="h-5 w-5 text-destructive" />
-              Report {userName || "User"}
-            </DialogTitle>
-            <DialogDescription>
-              Help us maintain a safe community by reporting policy violations.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            {!selectedType && (
-              <div className="space-y-2">
-                <Label>Select Report Type</Label>
-                <div className="grid gap-2">
-                  {REPORT_TYPES.map((type) => (
-                    <Button
-                      key={type.value}
-                      variant="outline"
-                      className="justify-start h-auto py-3 px-4"
-                      onClick={() => setSelectedType(type.value)}
-                      data-testid={`button-select-report-${type.value}`}
-                    >
-                      <div className="text-left">
-                        <div className="font-medium">{type.label}</div>
-                        <div className="text-xs text-muted-foreground">{type.description}</div>
-                      </div>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {selectedType && (
-              <>
-                <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-md">
-                  <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0" />
-                  <div>
-                    <p className="font-medium text-sm">
-                      {REPORT_TYPES.find(t => t.value === selectedType)?.label}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {REPORT_TYPES.find(t => t.value === selectedType)?.description}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="reason2">Additional Details (Optional)</Label>
-                  <Textarea
-                    id="reason2"
-                    placeholder="Provide any additional information that might help our review..."
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    className="min-h-[100px]"
-                    data-testid="input-report-reason"
-                  />
-                </div>
-              </>
-            )}
-          </div>
+          )}
 
           <DialogFooter>
-            {selectedType && (
-              <Button
-                variant="ghost"
-                onClick={() => setSelectedType("")}
-                disabled={reportMutation.isPending}
-              >
-                Back
+            {submitted ? (
+              <Button variant="outline" onClick={handleCloseDialog} data-testid="button-close-report">
+                Close
               </Button>
+            ) : (
+              <>
+                {selectedType && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => setSelectedType("")}
+                    disabled={reportMutation.isPending}
+                  >
+                    Back
+                  </Button>
+                )}
+                <Button
+                  variant="destructive"
+                  onClick={handleSubmitReport}
+                  disabled={!selectedType || reportMutation.isPending}
+                  data-testid="button-submit-report"
+                >
+                  {reportMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Flag className="h-4 w-4 mr-2" />
+                      Submit Report
+                    </>
+                  )}
+                </Button>
+              </>
             )}
-            <Button
-              variant="destructive"
-              onClick={handleSubmitReport}
-              disabled={!selectedType || reportMutation.isPending}
-              data-testid="button-submit-report"
-            >
-              {reportMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Flag className="h-4 w-4 mr-2" />
-                  Submit Report
-                </>
-              )}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

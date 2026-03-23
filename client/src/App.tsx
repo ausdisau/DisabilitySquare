@@ -31,6 +31,9 @@ import Forums from "@/pages/Forums";
 import ForumCategory from "@/pages/ForumCategory";
 import ForumThread from "@/pages/ForumThread";
 import NotFound from "@/pages/not-found";
+import SafetyCentre from "@/pages/SafetyCentre";
+import TermsOfService from "@/pages/TermsOfService";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -92,6 +95,9 @@ function Router() {
       <Route path="/forums" component={props => <PrivateRoute component={Forums} {...props} />} />
       <Route path="/forums/:slug" component={props => <PrivateRoute component={ForumCategory} {...props} />} />
       <Route path="/forums/:slug/:threadId" component={props => <PrivateRoute component={ForumThread} {...props} />} />
+      <Route path="/safety" component={SafetyCentre} />
+      <Route path="/terms" component={TermsOfService} />
+      <Route path="/privacy" component={PrivacyPolicy} />
       <Route component={NotFound} />
     </Switch>
   );

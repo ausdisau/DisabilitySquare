@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMyPoints } from "@/hooks/use-valorization";
 import {
   Home, Users, Gamepad2, User, Trophy, Puzzle,
-  Spline, BookOpen, Building2, BookMarked, Briefcase, Bus, Star, HeartHandshake, MessageCircle,
+  Spline, BookOpen, Building2, BookMarked, Briefcase, Bus, Star, HeartHandshake, MessageCircle, Shield,
 } from "lucide-react";
 import { CreatePostDialog } from "./CreatePostDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -61,6 +61,37 @@ export function Sidebar() {
       </div>
 
       <div className="sm-divider mt-4" />
+
+      {/* Safety & Legal links */}
+      <div className="mt-2 space-y-1">
+        <Link href="/safety">
+          <div
+            className={`sm-nav-link ${location === "/safety" ? "active" : ""}`}
+            data-testid="link-nav-safety-centre"
+            aria-current={location === "/safety" ? "page" : undefined}
+          >
+            <Shield
+              className={`sm-nav-icon h-5 w-5 shrink-0 ${location === "/safety" ? "text-primary" : "text-foreground/70"}`}
+              aria-hidden="true"
+            />
+            <span>Safety Centre</span>
+          </div>
+        </Link>
+        <div className="flex gap-3 px-3 py-1">
+          <Link href="/terms">
+            <span className="text-xs text-muted-foreground hover:text-primary underline cursor-pointer" data-testid="link-nav-terms">
+              Terms
+            </span>
+          </Link>
+          <Link href="/privacy">
+            <span className="text-xs text-muted-foreground hover:text-primary underline cursor-pointer" data-testid="link-nav-privacy">
+              Privacy
+            </span>
+          </Link>
+        </div>
+      </div>
+
+      <div className="sm-divider mt-2" />
 
       <Link href="/profile">
         <div
