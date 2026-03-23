@@ -3,13 +3,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMyPoints } from "@/hooks/use-valorization";
 import {
   Home, Users, Gamepad2, User, Trophy, Puzzle,
-  Spline, BookOpen, Building2, BookMarked, Briefcase, Bus, HeartHandshake, MessageCircle, Shield,
+  Spline, BookOpen, Building2, BookMarked, Briefcase, Bus, HeartHandshake, MessageCircle, Shield, Compass,
 } from "lucide-react";
 import { CreatePostDialog } from "./CreatePostDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const navItems = [
   { href: "/", label: "Village Square", icon: Home },
+  { href: "/discover", label: "Discover", icon: Compass },
   { href: "/connect", label: "Peer Connect", icon: HeartHandshake },
   { href: "/forums", label: "Forums", icon: MessageCircle },
   { href: "/groups", label: "Groups", icon: Users },

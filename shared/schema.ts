@@ -17,6 +17,7 @@ export const profiles = pgTable("profiles", {
     highContrast: boolean;
     fontSize: "normal" | "large" | "extra-large";
   }>().default({ highContrast: false, fontSize: "normal" }),
+  accessNeeds: jsonb("access_needs").$type<string[]>().default([]), // e.g. ['wheelchair', 'hearing', 'vision', 'auslan', 'quiet', 'accessible_bathroom']
   dateOfBirth: timestamp("date_of_birth"),
   ageVerified: boolean("age_verified").default(false),
   ageVerifiedAt: timestamp("age_verified_at"),
@@ -50,6 +51,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   badges: many(userBadges),
   pointsHistory: many(pointsLedger),
+  following: many(userConnections, { relationName: "follower" }),
+  followers: many(userConnections, { relationName: "following" }),
+  serviceAffinities: many(userServiceAffinities),
+  participationJourneys: many(participationJourneys),
 }));
 
 // === GROUPS ===
@@ -860,6 +865,149 @@ export type TripQuote = typeof tripQuotes.$inferSelect;
 export type InsertTripQuote = z.infer<typeof insertTripQuoteSchema>;
 export type Trip = typeof trips.$inferSelect;
 export type InsertTrip = z.infer<typeof insertTripSchema>;
+
+// === SOCIAL/KNOWLEDGE GRAPH — PARTICIPATION MATCHING ===
+
+// Venues — physical/online locations with accessibility metadata
+export const venues = pgTable("venues", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  address: text("address").notNull(),
+  suburb: text("suburb").notNull(),
+  state: text("state").notNull(),
+  postcode: text("postcode").notNull(),
+  isOnline: boolean("is_online").default(false),
+  lat: text("lat"),
+  lng: text("lng"),
+  phone: text("phone"),
+  website: text("website"),
+  accessibilityFeatures: jsonb("accessibility_features").$type<string[]>().default([]), // 'ramp', 'lift', 'hearing_loop', 'accessible_bathroom', 'quiet_room', 'braille', 'auslan'
+  imageUrl: text("image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const venuesRelations = relations(venues, ({ many }) => ({
+  events: many(events),
+}));
+
+export const insertVenueSchema = createInsertSchema(venues).omit({ id: true, createdAt: true });
+export type Venue = typeof venues.$inferSelect;
+export type InsertVenue = z.infer<typeof insertVenueSchema>;
+
+// Events/Activities — activities posted by groups or admins tied to a venue
+export const events = pgTable("events", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  venueId: integer("venue_id").references(() => venues.id),
+  groupId: integer("group_id").references(() => groups.id),
+  organiserUserId: varchar("organiser_user_id").references(() => users.id),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time"),
+  category: text("category").notNull(), // 'social', 'sport', 'art', 'health', 'education', 'support_group', 'other'
+  tags: jsonb("tags").$type<string[]>().default([]),
+  accessibilityNotes: text("accessibility_notes"),
+  maxAttendees: integer("max_attendees"),
+  isOnline: boolean("is_online").default(false),
+  meetingLink: text("meeting_link"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const eventsRelations = relations(events, ({ one, many }) => ({
+  venue: one(venues, { fields: [events.venueId], references: [venues.id] }),
+  group: one(groups, { fields: [events.groupId], references: [groups.id] }),
+  organiser: one(users, { fields: [events.organiserUserId], references: [users.id] }),
+  attendees: many(eventAttendees),
+}));
+
+export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true });
+export type Event = typeof events.$inferSelect;
+export type InsertEvent = z.infer<typeof insertEventSchema>;
+
+// Event Attendees — RSVP/attendance tracking
+export const eventAttendees = pgTable("event_attendees", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  status: text("status").notNull().default("going"), // 'going', 'interested', 'not_going'
+  joinedAt: timestamp("joined_at").defaultNow(),
+}, (table) => ({
+  uniqueAttendee: unique("unique_event_attendee").on(table.eventId, table.userId),
+}));
+
+export const eventAttendeesRelations = relations(eventAttendees, ({ one }) => ({
+  event: one(events, { fields: [eventAttendees.eventId], references: [events.id] }),
+  user: one(users, { fields: [eventAttendees.userId], references: [users.id] }),
+}));
+
+export const insertEventAttendeeSchema = createInsertSchema(eventAttendees).omit({ id: true, joinedAt: true });
+export type EventAttendee = typeof eventAttendees.$inferSelect;
+export type InsertEventAttendee = z.infer<typeof insertEventAttendeeSchema>;
+
+// User Connections — directional follows between users
+export const userConnections = pgTable("user_connections", {
+  id: serial("id").primaryKey(),
+  followerId: varchar("follower_id").notNull().references(() => users.id),
+  followingId: varchar("following_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniqueConnection: unique("unique_user_connection").on(table.followerId, table.followingId),
+}));
+
+export const userConnectionsRelations = relations(userConnections, ({ one }) => ({
+  follower: one(users, { fields: [userConnections.followerId], references: [users.id], relationName: "follower" }),
+  following: one(users, { fields: [userConnections.followingId], references: [users.id], relationName: "following" }),
+}));
+
+export const insertUserConnectionSchema = createInsertSchema(userConnections).omit({ id: true, createdAt: true });
+export type UserConnection = typeof userConnections.$inferSelect;
+export type InsertUserConnection = z.infer<typeof insertUserConnectionSchema>;
+
+// User Service Affinities — users save/rate service providers they've used
+export const userServiceAffinities = pgTable("user_service_affinities", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  serviceProviderId: integer("service_provider_id").notNull().references(() => serviceProviders.id),
+  rating: integer("rating"), // 1-5
+  notes: text("notes"),
+  savedAt: timestamp("saved_at").defaultNow(),
+}, (table) => ({
+  uniqueAffinity: unique("unique_user_service_affinity").on(table.userId, table.serviceProviderId),
+}));
+
+export const userServiceAffinitiesRelations = relations(userServiceAffinities, ({ one }) => ({
+  user: one(users, { fields: [userServiceAffinities.userId], references: [users.id] }),
+  serviceProvider: one(serviceProviders, { fields: [userServiceAffinities.serviceProviderId], references: [serviceProviders.id] }),
+}));
+
+export const insertUserServiceAffinitySchema = createInsertSchema(userServiceAffinities).omit({ id: true, savedAt: true });
+export type UserServiceAffinity = typeof userServiceAffinities.$inferSelect;
+export type InsertUserServiceAffinity = z.infer<typeof insertUserServiceAffinitySchema>;
+
+// Participation Journeys — declared intent: "I want to attend [event], I need [support] and [transport]"
+export const participationJourneys = pgTable("participation_journeys", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  eventId: integer("event_id").notNull().references(() => events.id),
+  serviceProviderId: integer("service_provider_id").references(() => serviceProviders.id),
+  transportProviderId: integer("transport_provider_id").references(() => transportProviders.id), // selected accessible transport provider
+  supportNeeds: jsonb("support_needs").$type<string[]>().default([]), // 'personal_care', 'communication', 'transport', 'behaviour'
+  status: text("status").notNull().default("planning"), // 'planning', 'confirmed', 'completed', 'cancelled'
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const participationJourneysRelations = relations(participationJourneys, ({ one }) => ({
+  user: one(users, { fields: [participationJourneys.userId], references: [users.id] }),
+  event: one(events, { fields: [participationJourneys.eventId], references: [events.id] }),
+  serviceProvider: one(serviceProviders, { fields: [participationJourneys.serviceProviderId], references: [serviceProviders.id] }),
+  transportProvider: one(transportProviders, { fields: [participationJourneys.transportProviderId], references: [transportProviders.id] }),
+}));
+
+export const insertParticipationJourneySchema = createInsertSchema(participationJourneys).omit({ id: true, createdAt: true, updatedAt: true });
+export type ParticipationJourney = typeof participationJourneys.$inferSelect;
+export type InsertParticipationJourney = z.infer<typeof insertParticipationJourneySchema>;
 
 // === AI CHAT CONVERSATIONS (for voice features) ===
 export const conversations = pgTable("conversations", {

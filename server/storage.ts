@@ -7,6 +7,7 @@ import {
   transportProviders, transportVehicles, tripQuotes, trips,
   postReactions,
   forumCategories, forumThreads, forumReplies, forumVotes,
+  venues, events, eventAttendees, userConnections, userServiceAffinities, participationJourneys,
   type User, type InsertUser,
   type Profile, type InsertProfile,
   type Group, type InsertGroup,
@@ -31,6 +32,12 @@ import {
   type ForumCategory, type InsertForumCategory,
   type ForumThread, type InsertForumThread,
   type ForumReply, type InsertForumReply,
+  type Venue, type InsertVenue,
+  type Event, type InsertEvent,
+  type EventAttendee, type InsertEventAttendee,
+  type UserConnection, type InsertUserConnection,
+  type UserServiceAffinity, type InsertUserServiceAffinity,
+  type ParticipationJourney, type InsertParticipationJourney,
   POINT_VALUES
 } from "@shared/schema";
 
@@ -134,6 +141,53 @@ export interface IStorage {
   // Public stats (unauthenticated)
   getPublicStats(): Promise<{ memberCount: number; threadCount: number; replyCount: number }>;
   getPublicRecentActivity(limit?: number): Promise<{ id: number; title: string; categorySlug: string; createdAt: Date | null }[]>;
+
+  // Venues
+  listVenues(): Promise<Venue[]>;
+  getVenue(id: number): Promise<Venue | undefined>;
+  createVenue(data: InsertVenue): Promise<Venue>;
+  updateVenue(id: number, data: Partial<InsertVenue>): Promise<Venue | undefined>;
+  deleteVenue(id: number): Promise<void>;
+  seedVenuesAndEvents(): Promise<void>;
+
+  // Events
+  listEvents(filters?: { groupId?: number; upcoming?: boolean }): Promise<(Event & { venue: Venue | null; attendeeCount: number })[]>;
+  getEvent(id: number): Promise<(Event & { venue: Venue | null; attendees: EventAttendee[] }) | undefined>;
+  createEvent(data: InsertEvent): Promise<Event>;
+  updateEvent(id: number, data: Partial<InsertEvent>): Promise<Event | undefined>;
+  deleteEvent(id: number): Promise<void>;
+  rsvpEvent(eventId: number, userId: string, status: string): Promise<EventAttendee>;
+  getUserEventRsvps(userId: string): Promise<EventAttendee[]>;
+
+  // User Connections (follows)
+  followUser(followerId: string, followingId: string): Promise<UserConnection>;
+  unfollowUser(followerId: string, followingId: string): Promise<void>;
+  isFollowing(followerId: string, followingId: string): Promise<boolean>;
+  getFollowing(userId: string): Promise<UserConnection[]>;
+  getFollowers(userId: string): Promise<UserConnection[]>;
+
+  // User Service Affinities
+  saveServiceAffinity(data: InsertUserServiceAffinity): Promise<UserServiceAffinity>;
+  getUserServiceAffinities(userId: string): Promise<(UserServiceAffinity & { serviceProvider: ServiceProvider })[]>;
+  removeServiceAffinity(userId: string, serviceProviderId: number): Promise<void>;
+
+  // Participation Journeys
+  createParticipationJourney(data: InsertParticipationJourney): Promise<ParticipationJourney>;
+  getUserJourneys(userId: string): Promise<(ParticipationJourney & { event: Event; serviceProvider: ServiceProvider | null; transportProvider: TransportProvider | null })[]>;
+  getJourney(id: number): Promise<ParticipationJourney | undefined>;
+  updateJourneyStatus(id: number, status: string): Promise<ParticipationJourney>;
+
+  // Graph Recommendations
+  getSuggestedConnections(userId: string, limit?: number): Promise<(User & { profile: Profile | null; sharedGroupCount: number })[]>;
+  getMatchedServices(userId: string, limit?: number): Promise<ServiceProvider[]>;
+  getMatchedEvents(userId: string, limit?: number): Promise<(Event & { venue: Venue | null; attendeeCount: number })[]>;
+  getJourneyOptions(userId: string, eventId: number): Promise<{
+    event: Event | undefined;
+    venue: Venue | undefined;
+    serviceProviders: ServiceProvider[];
+    transportProviders: (TransportProvider & { compatibleVehicleCount: number })[];
+    accessibilityWarnings: string[];
+  }>;
 
   // Transport Module
   seedTransportProviders(): Promise<void>;
@@ -980,6 +1034,564 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(forumThreads.createdAt))
       .limit(limit);
     return threads;
+  }
+
+  // === VENUES ===
+
+  async listVenues(): Promise<Venue[]> {
+    return db.select().from(venues).orderBy(venues.name);
+  }
+
+  async getVenue(id: number): Promise<Venue | undefined> {
+    const [venue] = await db.select().from(venues).where(eq(venues.id, id));
+    return venue;
+  }
+
+  async createVenue(data: InsertVenue): Promise<Venue> {
+    const [venue] = await db.insert(venues).values(data).returning();
+    return venue;
+  }
+
+  async updateVenue(id: number, data: Partial<InsertVenue>): Promise<Venue | undefined> {
+    const [updated] = await db.update(venues).set(data).where(eq(venues.id, id)).returning();
+    return updated;
+  }
+
+  async deleteVenue(id: number): Promise<void> {
+    await db.delete(venues).where(eq(venues.id, id));
+  }
+
+  async seedVenuesAndEvents(): Promise<void> {
+    const existingVenues = await db.select().from(venues).limit(1);
+    if (existingVenues.length > 0) return;
+
+    const venueData = [
+      {
+        name: "Accessible Arts NSW",
+        address: "93 Norton St",
+        suburb: "Leichhardt",
+        state: "NSW",
+        postcode: "2040",
+        isOnline: false,
+        lat: "-33.8826",
+        lng: "151.1577",
+        phone: "(02) 9550 2900",
+        website: "https://aarts.net.au",
+        accessibilityFeatures: ["ramp", "accessible_bathroom", "lift", "hearing_loop", "auslan"],
+      },
+      {
+        name: "Disability Resource Centre Melbourne",
+        address: "141 Capel St",
+        suburb: "North Melbourne",
+        state: "VIC",
+        postcode: "3051",
+        isOnline: false,
+        lat: "-37.7979",
+        lng: "144.9530",
+        phone: "(03) 9326 1006",
+        website: "https://drc.org.au",
+        accessibilityFeatures: ["ramp", "accessible_bathroom", "quiet_room", "hearing_loop"],
+      },
+      {
+        name: "Brisbane Disability Support Hub",
+        address: "66 Ann St",
+        suburb: "Brisbane City",
+        state: "QLD",
+        postcode: "4000",
+        isOnline: false,
+        lat: "-27.4698",
+        lng: "153.0251",
+        phone: "(07) 3831 8811",
+        website: "https://disability.qld.gov.au",
+        accessibilityFeatures: ["ramp", "lift", "accessible_bathroom", "braille"],
+      },
+      {
+        name: "Online Community Hub",
+        address: "Virtual",
+        suburb: "Online",
+        state: "National",
+        postcode: "0000",
+        isOnline: true,
+        accessibilityFeatures: ["auslan", "hearing_loop"],
+      },
+      {
+        name: "Perth Inclusion Centre",
+        address: "190 St Georges Tce",
+        suburb: "Perth",
+        state: "WA",
+        postcode: "6000",
+        isOnline: false,
+        lat: "-31.9534",
+        lng: "115.8585",
+        accessibilityFeatures: ["ramp", "accessible_bathroom", "quiet_room"],
+      },
+    ];
+
+    const insertedVenues = await db.insert(venues).values(venueData).returning();
+
+    const now = new Date();
+    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const twoWeeks = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const threeWeeks = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000);
+
+    const eventData = [
+      {
+        title: "Inclusive Art Workshop — Painting for All",
+        description: "A relaxed, accessible art session welcoming people of all abilities. No experience needed. Materials provided. Quiet room available.",
+        venueId: insertedVenues[0].id,
+        startTime: nextWeek,
+        endTime: new Date(nextWeek.getTime() + 2 * 60 * 60 * 1000),
+        category: "art",
+        tags: ["art", "inclusive", "creative", "beginner"],
+        accessibilityNotes: "Fully wheelchair accessible. Auslan interpreter available on request.",
+        maxAttendees: 20,
+        isOnline: false,
+      },
+      {
+        title: "NDIS Navigation Workshop",
+        description: "Learn how to get the most from your NDIS plan. Guest speaker from the NDIA. Light refreshments provided. Carer/support worker welcome.",
+        venueId: insertedVenues[1].id,
+        startTime: twoWeeks,
+        endTime: new Date(twoWeeks.getTime() + 3 * 60 * 60 * 1000),
+        category: "education",
+        tags: ["ndis", "funding", "planning"],
+        accessibilityNotes: "Hearing loop installed. Auslan available. Parking nearby with accessible bays.",
+        maxAttendees: 40,
+        isOnline: false,
+      },
+      {
+        title: "Online Peer Support Circle — Chronic Illness",
+        description: "A safe, moderated peer support group for people living with chronic illness. Share, listen, and connect from the comfort of your home.",
+        venueId: insertedVenues[3].id,
+        startTime: nextWeek,
+        endTime: new Date(nextWeek.getTime() + 90 * 60 * 1000),
+        category: "support_group",
+        tags: ["chronic_illness", "peer_support", "online", "mental_health"],
+        accessibilityNotes: "Zoom captions available. Low-bandwidth friendly.",
+        maxAttendees: 15,
+        isOnline: true,
+        meetingLink: "https://zoom.us/j/example",
+      },
+      {
+        title: "Adaptive Sport Day — Bocce & Wheelchair Basketball",
+        description: "Come try bocce and modified wheelchair basketball in a fun, non-competitive environment. Equipment and coaching provided.",
+        venueId: insertedVenues[2].id,
+        startTime: threeWeeks,
+        endTime: new Date(threeWeeks.getTime() + 4 * 60 * 60 * 1000),
+        category: "sport",
+        tags: ["sport", "adaptive", "wheelchair", "social"],
+        accessibilityNotes: "Full accessible facilities. Transport assistance available — contact organiser.",
+        maxAttendees: 30,
+        isOnline: false,
+      },
+      {
+        title: "Social Morning Tea — Connect & Chat",
+        description: "A relaxed morning tea for people with disability and their carers to meet neighbours and make connections. Hosted by Perth Inclusion Centre.",
+        venueId: insertedVenues[4].id,
+        startTime: nextWeek,
+        endTime: new Date(nextWeek.getTime() + 2 * 60 * 60 * 1000),
+        category: "social",
+        tags: ["social", "community", "connection"],
+        accessibilityNotes: "Quiet room available. Sensory-friendly environment.",
+        maxAttendees: 25,
+        isOnline: false,
+      },
+    ];
+
+    await db.insert(events).values(eventData);
+  }
+
+  // === EVENTS ===
+
+  async listEvents(filters?: { groupId?: number; upcoming?: boolean }): Promise<(Event & { venue: Venue | null; attendeeCount: number })[]> {
+    const conditions: any[] = [];
+    if (filters?.groupId) conditions.push(eq(events.groupId, filters.groupId));
+    if (filters?.upcoming) conditions.push(gte(events.startTime, new Date()));
+
+    const eventsData = await db.select().from(events)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(events.startTime);
+
+    const result = await Promise.all(eventsData.map(async (event) => {
+      const venue = event.venueId ? await this.getVenue(event.venueId) : null;
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(eventAttendees)
+        .where(and(eq(eventAttendees.eventId, event.id), eq(eventAttendees.status, "going")));
+      return { ...event, venue: venue ?? null, attendeeCount: count };
+    }));
+
+    return result;
+  }
+
+  async getEvent(id: number): Promise<(Event & { venue: Venue | null; attendees: EventAttendee[] }) | undefined> {
+    const [event] = await db.select().from(events).where(eq(events.id, id));
+    if (!event) return undefined;
+    const venue = event.venueId ? await this.getVenue(event.venueId) : null;
+    const attendeesList = await db.select().from(eventAttendees).where(eq(eventAttendees.eventId, id));
+    return { ...event, venue: venue ?? null, attendees: attendeesList };
+  }
+
+  async createEvent(data: InsertEvent): Promise<Event> {
+    const [event] = await db.insert(events).values(data).returning();
+    return event;
+  }
+
+  async updateEvent(id: number, data: Partial<InsertEvent>): Promise<Event | undefined> {
+    const [updated] = await db.update(events).set(data).where(eq(events.id, id)).returning();
+    return updated;
+  }
+
+  async deleteEvent(id: number): Promise<void> {
+    await db.delete(eventAttendees).where(eq(eventAttendees.eventId, id));
+    await db.delete(events).where(eq(events.id, id));
+  }
+
+  async rsvpEvent(eventId: number, userId: string, status: string): Promise<EventAttendee> {
+    const [attendee] = await db
+      .insert(eventAttendees)
+      .values({ eventId, userId, status })
+      .onConflictDoUpdate({
+        target: [eventAttendees.eventId, eventAttendees.userId],
+        set: { status },
+      })
+      .returning();
+    return attendee;
+  }
+
+  async getUserEventRsvps(userId: string): Promise<EventAttendee[]> {
+    return db.select().from(eventAttendees).where(eq(eventAttendees.userId, userId));
+  }
+
+  // === USER CONNECTIONS ===
+
+  async followUser(followerId: string, followingId: string): Promise<UserConnection> {
+    const [conn] = await db
+      .insert(userConnections)
+      .values({ followerId, followingId })
+      .onConflictDoNothing()
+      .returning();
+    if (!conn) {
+      const [existing] = await db.select().from(userConnections)
+        .where(and(eq(userConnections.followerId, followerId), eq(userConnections.followingId, followingId)));
+      return existing;
+    }
+    return conn;
+  }
+
+  async unfollowUser(followerId: string, followingId: string): Promise<void> {
+    await db.delete(userConnections)
+      .where(and(eq(userConnections.followerId, followerId), eq(userConnections.followingId, followingId)));
+  }
+
+  async isFollowing(followerId: string, followingId: string): Promise<boolean> {
+    const [conn] = await db.select().from(userConnections)
+      .where(and(eq(userConnections.followerId, followerId), eq(userConnections.followingId, followingId)));
+    return !!conn;
+  }
+
+  async getFollowing(userId: string): Promise<UserConnection[]> {
+    return db.select().from(userConnections).where(eq(userConnections.followerId, userId));
+  }
+
+  async getFollowers(userId: string): Promise<UserConnection[]> {
+    return db.select().from(userConnections).where(eq(userConnections.followingId, userId));
+  }
+
+  // === USER SERVICE AFFINITIES ===
+
+  async saveServiceAffinity(data: InsertUserServiceAffinity): Promise<UserServiceAffinity> {
+    const [affinity] = await db
+      .insert(userServiceAffinities)
+      .values(data)
+      .onConflictDoUpdate({
+        target: [userServiceAffinities.userId, userServiceAffinities.serviceProviderId],
+        set: { rating: data.rating, notes: data.notes },
+      })
+      .returning();
+    return affinity;
+  }
+
+  async getUserServiceAffinities(userId: string): Promise<(UserServiceAffinity & { serviceProvider: ServiceProvider })[]> {
+    const affinities = await db.query.userServiceAffinities.findMany({
+      where: eq(userServiceAffinities.userId, userId),
+      with: { serviceProvider: true },
+    });
+    return affinities as unknown as (UserServiceAffinity & { serviceProvider: ServiceProvider })[];
+  }
+
+  async removeServiceAffinity(userId: string, serviceProviderId: number): Promise<void> {
+    await db.delete(userServiceAffinities)
+      .where(and(eq(userServiceAffinities.userId, userId), eq(userServiceAffinities.serviceProviderId, serviceProviderId)));
+  }
+
+  // === PARTICIPATION JOURNEYS ===
+
+  async createParticipationJourney(data: InsertParticipationJourney): Promise<ParticipationJourney> {
+    const [journey] = await db.insert(participationJourneys).values(data).returning();
+    return journey;
+  }
+
+  async getUserJourneys(userId: string): Promise<(ParticipationJourney & { event: Event; serviceProvider: ServiceProvider | null; transportProvider: TransportProvider | null })[]> {
+    type JourneyWithRelations = ParticipationJourney & {
+      event: Event;
+      serviceProvider: ServiceProvider | null;
+      transportProvider: TransportProvider | null;
+    };
+    const journeys = await db.query.participationJourneys.findMany({
+      where: eq(participationJourneys.userId, userId),
+      with: {
+        event: true,
+        serviceProvider: true,
+        transportProvider: true,
+      },
+      orderBy: [desc(participationJourneys.createdAt)],
+    });
+    return journeys as unknown as JourneyWithRelations[];
+  }
+
+  async getJourney(id: number): Promise<ParticipationJourney | undefined> {
+    const [journey] = await db.select().from(participationJourneys).where(eq(participationJourneys.id, id));
+    return journey;
+  }
+
+  async updateJourneyStatus(id: number, status: string): Promise<ParticipationJourney> {
+    const [updated] = await db.update(participationJourneys)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(participationJourneys.id, id))
+      .returning();
+    return updated;
+  }
+
+  // === GRAPH RECOMMENDATIONS ===
+
+  async getSuggestedConnections(userId: string, limit = 10): Promise<(User & { profile: Profile | null; sharedGroupCount: number })[]> {
+    // Get user's groups
+    const myMemberships = await db.select({ groupId: groupMembers.groupId })
+      .from(groupMembers).where(eq(groupMembers.userId, userId));
+    const myGroupIds = myMemberships.map(m => m.groupId);
+
+    // Get users I already follow
+    const following = await this.getFollowing(userId);
+    const followingIds = new Set(following.map(f => f.followingId));
+    followingIds.add(userId); // exclude self
+
+    // Find other members in same groups
+    let candidateUserIds: string[] = [];
+    if (myGroupIds.length > 0) {
+      const membersInMyGroups = await db.select({ userId: groupMembers.userId })
+        .from(groupMembers)
+        .where(and(inArray(groupMembers.groupId, myGroupIds), ne(groupMembers.userId, userId)));
+      candidateUserIds = membersInMyGroups.map(m => m.userId);
+    }
+
+    if (candidateUserIds.length === 0) {
+      // Fall back to peer matching
+      const peers = await this.getPeerMatches(userId, limit);
+      return peers.map(u => ({ ...u, sharedGroupCount: 0 }));
+    }
+
+    // Count shared groups per candidate
+    const sharedGroupCounts: Record<string, number> = {};
+    for (const uid of candidateUserIds) {
+      if (followingIds.has(uid)) continue;
+      sharedGroupCounts[uid] = (sharedGroupCounts[uid] || 0) + 1;
+    }
+
+    const uniqueCandidateIds = Object.keys(sharedGroupCounts).slice(0, 50);
+    if (uniqueCandidateIds.length === 0) return [];
+
+    const candidateUsers = await db.query.users.findMany({
+      where: inArray(users.id, uniqueCandidateIds),
+      with: { profile: true },
+    });
+
+    const myProfile = await this.getProfile(userId);
+    const myInterests: string[] = (myProfile?.interests as string[]) || [];
+    const myDiagnosis = myProfile?.diagnosis?.toLowerCase() || "";
+
+    type CandidateUser = User & { profile: Profile | null };
+    const scored = (candidateUsers as CandidateUser[]).map((u) => {
+      const profile = u.profile;
+      let score = (sharedGroupCounts[u.id] || 0) * 2;
+      if (profile?.diagnosis && myDiagnosis && profile.diagnosis.toLowerCase().includes(myDiagnosis)) score += 3;
+      const theirInterests: string[] = (profile?.interests as string[]) || [];
+      score += theirInterests.filter((i) => myInterests.includes(i)).length;
+      return { ...u, _score: score, sharedGroupCount: sharedGroupCounts[u.id] || 0 };
+    });
+
+    type ScoredCandidate = CandidateUser & { _score: number; sharedGroupCount: number };
+    return (scored as ScoredCandidate[])
+      .sort((a, b) => b._score - a._score)
+      .slice(0, limit)
+      .map(({ _score, ...u }) => u as User & { profile: Profile | null; sharedGroupCount: number });
+  }
+
+  async getMatchedServices(userId: string, limit = 8): Promise<ServiceProvider[]> {
+    const myProfile = await this.getProfile(userId);
+    const myDiagnosis = myProfile?.diagnosis?.toLowerCase() || "";
+    const myLocation = myProfile?.location || "";
+    const myInterests: string[] = (myProfile?.interests as string[]) || [];
+
+    const allProviders = await db.select().from(serviceProviders)
+      .where(eq(serviceProviders.approved, true))
+      .orderBy(serviceProviders.name);
+
+    type ScoredProvider = typeof allProviders[0] & { _score: number };
+    const scored: ScoredProvider[] = allProviders.map((p) => {
+      let score = 0;
+      const disabilityTypes = (p.disabilityTypes as string[]) || [];
+      const categories = (p.category || "").toLowerCase();
+
+      // Diagnosis match against provider disability types
+      if (myDiagnosis && disabilityTypes.some((d) =>
+        d.toLowerCase().includes(myDiagnosis) || myDiagnosis.includes(d.toLowerCase())
+      )) {
+        score += 5;
+      }
+
+      // Location match (state or suburb)
+      if (myLocation && (
+        p.state === myLocation ||
+        p.location.toLowerCase().includes(myLocation.toLowerCase())
+      )) {
+        score += 3;
+      }
+
+      // Interest overlap with provider category or disability types
+      if (myInterests.length > 0) {
+        const interestMatch = myInterests.some((interest) =>
+          categories.includes(interest.toLowerCase()) ||
+          disabilityTypes.some((d) => d.toLowerCase().includes(interest.toLowerCase()))
+        );
+        if (interestMatch) score += 2;
+      }
+
+      if (p.ndisRegistered) score += 1;
+      return { ...p, _score: score };
+    });
+
+    return scored
+      .sort((a, b) => b._score - a._score)
+      .slice(0, limit)
+      .map(({ _score, ...p }) => p);
+  }
+
+  async getMatchedEvents(userId: string, limit = 8): Promise<(Event & { venue: Venue | null; attendeeCount: number })[]> {
+    const myProfile = await this.getProfile(userId);
+    const myInterests: string[] = (myProfile?.interests as string[]) || [];
+
+    const myMemberships = await db.select({ groupId: groupMembers.groupId })
+      .from(groupMembers).where(eq(groupMembers.userId, userId));
+    const myGroupIds = myMemberships.map(m => m.groupId);
+
+    const upcomingEvents = await this.listEvents({ upcoming: true });
+
+    const scored = upcomingEvents.map((e) => {
+      let score = 0;
+      const tags = (e.tags as string[]) || [];
+      score += tags.filter(t => myInterests.some(i => i.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(i.toLowerCase()))).length * 2;
+      if (e.groupId && myGroupIds.includes(e.groupId)) score += 4;
+      return { ...e, _score: score };
+    });
+
+    return scored
+      .sort((a, b) => b._score - a._score)
+      .slice(0, limit)
+      .map(({ _score, ...e }) => e);
+  }
+
+  async getJourneyOptions(userId: string, eventId: number): Promise<{
+    event: Event | undefined;
+    venue: Venue | undefined;
+    serviceProviders: ServiceProvider[];
+    transportProviders: (TransportProvider & { compatibleVehicleCount: number })[];
+    accessibilityWarnings: string[];
+  }> {
+    const event = await this.getEvent(eventId);
+    const venue = event?.venueId ? await this.getVenue(event.venueId) : undefined;
+
+    // Use profile.accessNeeds (not user table — access needs are on the profile)
+    const profile = await this.getProfile(userId);
+    const userNeeds: string[] = (profile?.accessNeeds as string[]) || [];
+
+    // Map user access needs to venue accessibility feature keys
+    const needToVenueFeatureMap: Record<string, string> = {
+      wheelchair: "ramp",
+      hearing: "hearing_loop",
+      vision: "braille",
+      auslan: "auslan",
+      quiet: "quiet_room",
+      lift: "lift",
+      accessible_bathroom: "accessible_bathroom",
+    };
+
+    const accessibilityWarnings: string[] = [];
+    if (venue && !venue.isOnline && userNeeds.length > 0) {
+      const venueFeatures = (venue.accessibilityFeatures as string[]) || [];
+      for (const need of userNeeds) {
+        const requiredFeature = needToVenueFeatureMap[need];
+        if (requiredFeature && !venueFeatures.includes(requiredFeature)) {
+          accessibilityWarnings.push(
+            `Venue may not fully support your '${need}' access need — '${requiredFeature}' not listed in venue features.`
+          );
+        }
+      }
+    }
+
+    const matchedServices = await this.getMatchedServices(userId, 5);
+
+    // Get all transport providers with vehicle accessibility data
+    // Filter vehicles that match user's access needs, return provider + compatible vehicle count
+    const allProviders = await this.listTransportProviders();
+    const transportProviders: (TransportProvider & { compatibleVehicleCount: number })[] = [];
+
+    for (const provider of allProviders) {
+      // Load vehicles for this provider and check accessibility features
+      const vehicles = await db
+        .select()
+        .from(transportVehicles)
+        .where(eq(transportVehicles.providerId, provider.id));
+
+      let compatibleVehicleCount = 0;
+      if (userNeeds.length === 0) {
+        // No specific needs — all vehicles are compatible
+        compatibleVehicleCount = vehicles.filter((v) => v.available).length;
+      } else {
+        // Need to vehicle feature map (wheelchair = 'wheelchair_van', hearing_loop = vehicle accessibility_features entry)
+        const vehicleNeedToFeatureMap: Record<string, string[]> = {
+          wheelchair: ["wheelchair_ramp", "wheelchair_lift"],
+          hearing: ["hearing_loop"],
+          vision: ["audio_announcements"],
+          auslan: [],
+          quiet: [],
+          lift: ["wheelchair_lift"],
+          accessible_bathroom: [],
+        };
+        for (const vehicle of vehicles) {
+          if (!vehicle.available) continue;
+          const vFeatures = (vehicle.accessibilityFeatures as string[]) || [];
+          const vehicleType = vehicle.vehicleType || "";
+          const meetsNeeds = userNeeds.every((need) => {
+            // wheelchair users need wheelchair_van OR a vehicle with ramp/lift features
+            if (need === "wheelchair") {
+              return vehicleType === "wheelchair_van" ||
+                vFeatures.some((f) => ["wheelchair_ramp", "wheelchair_lift"].includes(f));
+            }
+            const requiredFeatures = vehicleNeedToFeatureMap[need] || [];
+            return requiredFeatures.length === 0 || requiredFeatures.some((f) => vFeatures.includes(f));
+          });
+          if (meetsNeeds) compatibleVehicleCount++;
+        }
+      }
+
+      transportProviders.push({ ...provider, compatibleVehicleCount });
+    }
+
+    // Sort providers: those with compatible vehicles first
+    transportProviders.sort((a, b) => b.compatibleVehicleCount - a.compatibleVehicleCount);
+
+    return { event, venue, serviceProviders: matchedServices, transportProviders, accessibilityWarnings };
   }
 }
 

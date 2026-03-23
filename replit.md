@@ -310,3 +310,4 @@ A structured, pre-algorithmic bulletin board system for peer advice and communit
 - Seeded 10 service providers, 10 resources, 6 job listings (all approved)
 - Added Transport Search & Booking Module with adapter pattern, NDIS support, public access
 - Redesigned UI to 2004-era social network aesthetic: fixed-width boxy layout, colored section headers, flat post cards, top nav bar, chronological feed with right sidebar (community stats, top members, groups)
+- Added Social/Knowledge Graph — Participation Matching & Discover Page (`/discover`)

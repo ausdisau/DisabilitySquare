@@ -84,6 +84,15 @@ app.use((req, res, next) => {
     log(`Forum categories seed failed: ${err}`, "forums");
   }
 
+  // Seed venues and events on startup
+  try {
+    const { storage } = await import("./storage");
+    await storage.seedVenuesAndEvents();
+    log("Venues and events ready", "discover");
+  } catch (err) {
+    log(`Venues/events seed failed: ${err}`, "discover");
+  }
+
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

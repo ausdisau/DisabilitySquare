@@ -1373,5 +1373,284 @@ export async function registerRoutes(
     }
   });
 
+  // === GRAPH / DISCOVER ROUTES ===
+
+  // Venues
+  app.get("/api/venues", async (req, res) => {
+    try {
+      const venueList = await storage.listVenues();
+      res.json(venueList);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/venues/:id", async (req, res) => {
+    try {
+      const venue = await storage.getVenue(Number(req.params.id));
+      if (!venue) return res.status(404).json({ message: "Venue not found" });
+      res.json(venue);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/venues", isAuthenticated, async (req: any, res) => {
+    try {
+      const venueSchema = z.object({
+        name: z.string().min(1),
+        address: z.string().min(1),
+        suburb: z.string().min(1),
+        state: z.string().min(1),
+        postcode: z.string().optional().nullable(),
+        isOnline: z.boolean().default(false),
+        lat: z.string().optional().nullable(),
+        lng: z.string().optional().nullable(),
+        phone: z.string().optional().nullable(),
+        website: z.string().url().optional().nullable(),
+        accessibilityFeatures: z.array(z.string()).default([]),
+        imageUrl: z.string().url().optional().nullable(),
+      });
+      const input = venueSchema.parse(req.body);
+      const venue = await storage.createVenue(input);
+      res.status(201).json(venue);
+    } catch (e: any) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/venues/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const updated = await storage.updateVenue(Number(req.params.id), req.body);
+      if (!updated) return res.status(404).json({ message: "Venue not found" });
+      res.json(updated);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.delete("/api/venues/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      await storage.deleteVenue(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // Events
+  app.get("/api/events", async (req, res) => {
+    try {
+      const filters = {
+        groupId: req.query.groupId ? Number(req.query.groupId) : undefined,
+        upcoming: req.query.upcoming === "true" ? true : undefined,
+      };
+      const eventList = await storage.listEvents(filters);
+      res.json(eventList);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/events/rsvps/mine", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const rsvps = await storage.getUserEventRsvps(userId);
+      res.json(rsvps);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/events/:id", async (req, res) => {
+    try {
+      const event = await storage.getEvent(Number(req.params.id));
+      if (!event) return res.status(404).json({ message: "Event not found" });
+      res.json(event);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/events", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const event = await storage.createEvent({ ...req.body, organiserUserId: userId });
+      res.status(201).json(event);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.patch("/api/events/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const event = await storage.getEvent(Number(req.params.id));
+      if (!event) return res.status(404).json({ message: "Event not found" });
+      if (event.organiserUserId !== userId) {
+        const user = await storage.getUser(userId);
+        if (!user?.isAdmin) return res.status(403).json({ message: "Forbidden" });
+      }
+      const updated = await storage.updateEvent(Number(req.params.id), req.body);
+      res.json(updated);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.delete("/api/events/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const event = await storage.getEvent(Number(req.params.id));
+      if (!event) return res.status(404).json({ message: "Event not found" });
+      if (event.organiserUserId !== userId) {
+        const user = await storage.getUser(userId);
+        if (!user?.isAdmin) return res.status(403).json({ message: "Forbidden" });
+      }
+      await storage.deleteEvent(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/events/:id/rsvp", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const { status } = req.body;
+      const validStatuses = ["going", "interested", "not_going"];
+      if (!validStatuses.includes(status)) return res.status(400).json({ message: "Invalid status" });
+      const attendee = await storage.rsvpEvent(Number(req.params.id), userId, status);
+      res.json(attendee);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // User Connections
+  app.post("/api/connections/follow/:userId", isAuthenticated, async (req: any, res) => {
+    try {
+      const followerId = req.userId || req.oidc?.user?.sub;
+      const followingId = req.params.userId;
+      if (followerId === followingId) return res.status(400).json({ message: "Cannot follow yourself" });
+      const conn = await storage.followUser(followerId, followingId);
+      res.json(conn);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.delete("/api/connections/follow/:userId", isAuthenticated, async (req: any, res) => {
+    try {
+      const followerId = req.userId || req.oidc?.user?.sub;
+      await storage.unfollowUser(followerId, req.params.userId);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/connections/following", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const following = await storage.getFollowing(userId);
+      res.json(following);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/connections/followers", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const followers = await storage.getFollowers(userId);
+      res.json(followers);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // User Service Affinities
+  app.get("/api/affinities", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const affinities = await storage.getUserServiceAffinities(userId);
+      res.json(affinities);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/affinities", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const affinitySchema = z.object({
+        serviceProviderId: z.number().int().positive(),
+        rating: z.number().int().min(1).max(5).optional().nullable(),
+        notes: z.string().max(500).optional().nullable(),
+      });
+      const input = affinitySchema.parse(req.body);
+      const affinity = await storage.saveServiceAffinity({ ...input, userId });
+      res.json(affinity);
+    } catch (e: any) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.delete("/api/affinities/:providerId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      await storage.removeServiceAffinity(userId, Number(req.params.providerId));
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // Participation Journeys
+  app.get("/api/journeys", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const journeys = await storage.getUserJourneys(userId);
+      res.json(journeys);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/journeys", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const journeySchema = z.object({
+        eventId: z.number().int().positive(),
+        serviceProviderId: z.number().int().positive().optional().nullable(),
+        transportProviderId: z.number().int().positive().optional().nullable(),
+        supportNeeds: z.array(z.string()).default([]),
+        notes: z.string().optional().nullable(),
+      });
+      const input = journeySchema.parse(req.body);
+      const journey = await storage.createParticipationJourney({ ...input, userId, status: "planning" });
+      res.status(201).json(journey);
+    } catch (e: any) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/journeys/:id/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const journeyId = Number(req.params.id);
+      const journey = await storage.getJourney(journeyId);
+      if (!journey) return res.status(404).json({ message: "Journey not found" });
+      if (journey.userId !== userId) return res.status(403).json({ message: "Forbidden" });
+      const validStatuses = ["planning", "confirmed", "completed", "cancelled"];
+      const { status } = req.body;
+      if (!validStatuses.includes(status)) return res.status(400).json({ message: "Invalid status" });
+      const updated = await storage.updateJourneyStatus(journeyId, status);
+      res.json(updated);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // Graph Recommendation Endpoints
+  app.get("/api/graph/connections", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const limit = Math.min(Number(req.query.limit) || 10, 30);
+      const suggestions = await storage.getSuggestedConnections(userId, limit);
+      res.json(suggestions);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/graph/services", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const services = await storage.getMatchedServices(userId);
+      res.json(services);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/graph/events", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const matchedEvents = await storage.getMatchedEvents(userId);
+      res.json(matchedEvents);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/graph/journey-options/:eventId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const options = await storage.getJourneyOptions(userId, Number(req.params.eventId));
+      res.json(options);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   return httpServer;
 }
