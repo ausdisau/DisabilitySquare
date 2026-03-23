@@ -18,7 +18,8 @@ import {
   BookOpen,
   Building2,
   BookMarked,
-  Briefcase
+  Briefcase,
+  Bus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +42,7 @@ export function Sidebar() {
     { href: "/providers", label: "Services", icon: Building2 },
     { href: "/resources", label: "Resources", icon: BookMarked },
     { href: "/jobs", label: "Jobs", icon: Briefcase },
+    { href: "/transport", label: "Transport", icon: Bus },
     { href: "/recognition", label: "Recognition", icon: Trophy },
     { href: "/games", label: "Games", icon: Gamepad2 },
     { href: "/extensions", label: "Extensions", icon: Puzzle },

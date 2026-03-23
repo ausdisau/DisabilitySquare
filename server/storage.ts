@@ -4,6 +4,7 @@ import {
   users, profiles, groups, posts, comments, gameScores, groupMembers,
   badges, userBadges, pointsLedger, userPoints, userReports,
   spoonStatus, journalEntries, serviceProviders, resources, savedResources, jobListings,
+  transportProviders, tripRequests,
   type User, type InsertUser,
   type Profile, type InsertProfile,
   type Group, type InsertGroup,
@@ -20,6 +21,8 @@ import {
   type ServiceProvider, type InsertServiceProvider,
   type Resource, type InsertResource,
   type JobListing, type InsertJobListing,
+  type TransportProvider, type InsertTransportProvider,
+  type TripRequest, type InsertTripRequest,
   POINT_VALUES
 } from "@shared/schema";
 
@@ -94,6 +97,17 @@ export interface IStorage {
   getJobListing(id: number): Promise<JobListing | undefined>;
   createJobListing(data: InsertJobListing, postedById: string): Promise<JobListing>;
   approveJobListing(id: number): Promise<void>;
+
+  // Transport Providers
+  listTransportProviders(filters?: { type?: string; state?: string; isWheelchairAccessible?: boolean; acceptsCompanionCard?: boolean; isNdisTransportFunded?: boolean; search?: string }): Promise<TransportProvider[]>;
+  getTransportProvider(id: number): Promise<TransportProvider | undefined>;
+  createTransportProvider(data: InsertTransportProvider, submittedById: string): Promise<TransportProvider>;
+  approveTransportProvider(id: number): Promise<void>;
+
+  // Trip Requests
+  createTripRequest(data: InsertTripRequest, userId: string): Promise<TripRequest>;
+  listMyTripRequests(userId: string): Promise<TripRequest[]>;
+  cancelTripRequest(id: number, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -487,6 +501,46 @@ export class DatabaseStorage implements IStorage {
 
   async approveJobListing(id: number): Promise<void> {
     await db.update(jobListings).set({ approved: true }).where(eq(jobListings.id, id));
+  }
+
+  // === TRANSPORT PROVIDERS ===
+  async listTransportProviders(filters?: { type?: string; state?: string; isWheelchairAccessible?: boolean; acceptsCompanionCard?: boolean; isNdisTransportFunded?: boolean; search?: string }): Promise<TransportProvider[]> {
+    const conditions = [eq(transportProviders.approved, true)];
+    if (filters?.type) conditions.push(eq(transportProviders.type, filters.type));
+    if (filters?.state) conditions.push(eq(transportProviders.state, filters.state));
+    if (filters?.isWheelchairAccessible) conditions.push(eq(transportProviders.isWheelchairAccessible, true));
+    if (filters?.acceptsCompanionCard) conditions.push(eq(transportProviders.acceptsCompanionCard, true));
+    if (filters?.isNdisTransportFunded) conditions.push(eq(transportProviders.isNdisTransportFunded, true));
+    if (filters?.search) conditions.push(sql`${transportProviders.name} ILIKE ${`%${filters.search}%`}`);
+    return await db.select().from(transportProviders).where(and(...conditions)).orderBy(transportProviders.name);
+  }
+
+  async getTransportProvider(id: number): Promise<TransportProvider | undefined> {
+    const [provider] = await db.select().from(transportProviders).where(eq(transportProviders.id, id));
+    return provider;
+  }
+
+  async createTransportProvider(data: InsertTransportProvider, submittedById: string): Promise<TransportProvider> {
+    const [newProvider] = await db.insert(transportProviders).values({ ...data, submittedById, approved: false }).returning();
+    return newProvider;
+  }
+
+  async approveTransportProvider(id: number): Promise<void> {
+    await db.update(transportProviders).set({ approved: true }).where(eq(transportProviders.id, id));
+  }
+
+  // === TRIP REQUESTS ===
+  async createTripRequest(data: InsertTripRequest, userId: string): Promise<TripRequest> {
+    const [request] = await db.insert(tripRequests).values({ ...data, userId, status: "pending" }).returning();
+    return request;
+  }
+
+  async listMyTripRequests(userId: string): Promise<TripRequest[]> {
+    return await db.select().from(tripRequests).where(eq(tripRequests.userId, userId)).orderBy(desc(tripRequests.createdAt));
+  }
+
+  async cancelTripRequest(id: number, userId: string): Promise<void> {
+    await db.update(tripRequests).set({ status: "cancelled" }).where(and(eq(tripRequests.id, id), eq(tripRequests.userId, userId)));
   }
 }
 

@@ -731,6 +731,68 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // === TRANSPORT MODULE ===
+  app.get('/api/transport', async (req: any, res) => {
+    try {
+      const { type, state, wheelchair, companion, ndis, search } = req.query;
+      const providers = await storage.listTransportProviders({
+        type: type as string | undefined,
+        state: state as string | undefined,
+        isWheelchairAccessible: wheelchair === 'true' ? true : undefined,
+        acceptsCompanionCard: companion === 'true' ? true : undefined,
+        isNdisTransportFunded: ndis === 'true' ? true : undefined,
+        search: search as string | undefined,
+      });
+      res.json(providers);
+    } catch {
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/transport', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.oidc?.user?.sub || req.userId;
+      const { insertTransportProviderSchema } = await import('@shared/schema');
+      const input = insertTransportProviderSchema.parse(req.body);
+      const provider = await storage.createTransportProvider(input, userId);
+      res.status(201).json(provider);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/transport/:id/approve', isAuthenticated, isAdmin, async (req: any, res) => {
+    await storage.approveTransportProvider(Number(req.params.id));
+    res.json({ success: true });
+  });
+
+  // Trip Requests
+  app.get('/api/transport/my-trips', isAuthenticated, async (req: any, res) => {
+    const userId = req.oidc?.user?.sub || req.userId;
+    const trips = await storage.listMyTripRequests(userId);
+    res.json(trips);
+  });
+
+  app.post('/api/transport/trips', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.oidc?.user?.sub || req.userId;
+      const { insertTripRequestSchema } = await import('@shared/schema');
+      const input = insertTripRequestSchema.parse(req.body);
+      const trip = await storage.createTripRequest(input, userId);
+      res.status(201).json(trip);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.patch('/api/transport/trips/:id/cancel', isAuthenticated, async (req: any, res) => {
+    const userId = req.oidc?.user?.sub || req.userId;
+    await storage.cancelTripRequest(Number(req.params.id), userId);
+    res.json({ success: true });
+  });
+
   // === VOICE TRANSCRIPTION (Accessibility Feature) ===
   const MAX_AUDIO_SIZE = 10 * 1024 * 1024; // 10MB limit
   

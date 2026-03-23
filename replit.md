@@ -172,6 +172,15 @@ Five key features added to differentiate DisabilitySquare:
 - Shows accessible workplace and disability-welcome badges
 - Click-through to apply online or via email
 
+### 6. Accessible Transport (`/transport`)
+- Directory of 10 seeded Australian accessible transport providers
+- Filter by type (public transport, taxi, rideshare, community, NDIS), state, wheelchair accessibility, Companion Card, NDIS funding
+- Search by provider name
+- Expandable provider cards with features, phone, website
+- Trip request form (authenticated users can log transport needs with date, accessibility requirements)
+- My Trip Requests tab — view and cancel pending trip requests
+- NDIS Transport Info tab — guides on NDIS transport funding, Companion Card, taxi subsidy schemes by state
+
 ## Recent Changes
 
 - Integrated Auth0 authentication
@@ -191,3 +200,5 @@ Five key features added to differentiate DisabilitySquare:
 - ExtensionContext now uses storage methods for consistent valorization behavior
 - Added 5 competitive features: Spoon Tracker, Health Journal, Service Directory, Resource Library, Job Board
 - Seeded 10 service providers, 10 resources, 6 job listings (all approved)
+- Added Transport module: accessible transport directory, trip requests, NDIS info
+- Seeded 10 Australian accessible transport providers (all approved)
