@@ -20,6 +20,10 @@ const schema = z.object({
   body: z.string().min(20, "Please write at least 20 characters"),
   isAdviceRequest: z.boolean().default(false),
   tags: z.string().optional(),
+  imageUrl1: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  imageUrl2: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  imageUrl3: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  imageUrl4: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -42,6 +46,10 @@ export function CreateThreadDialog({ categories, defaultCategorySlug }: CreateTh
       body: "",
       isAdviceRequest: false,
       tags: "",
+      imageUrl1: "",
+      imageUrl2: "",
+      imageUrl3: "",
+      imageUrl4: "",
     },
   });
 
@@ -50,11 +58,14 @@ export function CreateThreadDialog({ categories, defaultCategorySlug }: CreateTh
       const tags = values.tags
         ? values.tags.split(",").map(t => t.trim()).filter(Boolean)
         : [];
+      const mediaUrls = [values.imageUrl1, values.imageUrl2, values.imageUrl3, values.imageUrl4]
+        .filter(Boolean) as string[];
       return apiRequest("POST", `/api/forums/categories/${values.categorySlug}/threads`, {
         title: values.title,
         body: values.body,
         isAdviceRequest: values.isAdviceRequest,
         tags,
+        mediaUrls,
       });
     },
     onSuccess: (_, values) => {
@@ -78,7 +89,7 @@ export function CreateThreadDialog({ categories, defaultCategorySlug }: CreateTh
           New Thread
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-[#1B4B8A]">Start a New Thread</DialogTitle>
         </DialogHeader>
@@ -147,6 +158,29 @@ export function CreateThreadDialog({ categories, defaultCategorySlug }: CreateTh
                 </FormItem>
               )}
             />
+            <div className="space-y-2">
+              <p className="text-[12px] font-medium text-foreground">Image URLs <span className="text-gray-400 font-normal">(optional, up to 4)</span></p>
+              {(["imageUrl1", "imageUrl2", "imageUrl3", "imageUrl4"] as const).map((name, i) => (
+                <FormField
+                  key={name}
+                  control={form.control}
+                  name={name}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder={`Image URL ${i + 1}`}
+                          className="h-8 text-[12px]"
+                          data-testid={`input-thread-image-url-${i + 1}`}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ))}
+            </div>
             <FormField
               control={form.control}
               name="isAdviceRequest"
