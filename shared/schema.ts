@@ -534,6 +534,12 @@ export const userReports = pgTable("user_reports", {
   reviewedAt: timestamp("reviewed_at"),
   reviewedBy: varchar("reviewed_by").references(() => users.id),
   adminNotes: text("admin_notes"),
+  // eSafety scheme extension
+  esafetyScheme: varchar("esafety_scheme", { length: 50 }), // 'basic_online_safety', 'online_safety_code', 'online_safety_act'
+  urgencyLevel: varchar("urgency_level", { length: 20 }), // 'low', 'medium', 'high', 'critical'
+  reportReference: text("report_reference"), // External reference number (e.g. eSafety case ID)
+  targetContentType: varchar("target_content_type", { length: 50 }), // 'post', 'comment', 'forum_thread', 'forum_reply', 'profile'
+  targetContentId: integer("target_content_id"), // ID of the reported content item
 }, (table) => ({
   uniqueReport: unique("unique_report_per_user_type").on(table.reporterId, table.reportedUserId, table.reportType),
 }));

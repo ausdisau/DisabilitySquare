@@ -392,6 +392,87 @@ export async function registerRoutes(
     res.json({ hasReported });
   });
 
+  // Create an eSafety scheme-typed report (extended)
+  app.post("/api/reports/esafety", isAuthenticated, async (req: any, res) => {
+    const reporterId = req.userId || req.oidc?.user?.sub;
+    try {
+      const schema = z.object({
+        reportedUserId: z.string().min(1),
+        reportType: z.enum(['underage', 'harassment', 'inappropriate_content', 'spam', 'other', 'cyber_abuse', 'image_based_abuse', 'illegal_content']),
+        reason: z.string().optional(),
+        esafetyScheme: z.enum(['basic_online_safety', 'online_safety_code', 'online_safety_act']).optional(),
+        urgencyLevel: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+        reportReference: z.string().optional(),
+        targetContentType: z.enum(['post', 'comment', 'forum_thread', 'forum_reply', 'profile']).optional(),
+        targetContentId: z.number().int().optional(),
+      });
+      const input = schema.parse(req.body);
+      if (input.reportedUserId === reporterId) {
+        return res.status(400).json({ message: "You cannot report yourself" });
+      }
+      // Check for duplicate: same reporter, reported user, and report type
+      const alreadyReported = await storage.hasReportedUser(reporterId, input.reportedUserId, input.reportType);
+      if (alreadyReported) {
+        return res.status(400).json({ message: "You have already submitted a report of this type against this user" });
+      }
+      const report = await storage.createUserReport({
+        reporterId,
+        reportedUserId: input.reportedUserId,
+        reportType: input.reportType,
+        reason: input.reason ?? null,
+        status: 'pending',
+        esafetyScheme: input.esafetyScheme ?? null,
+        urgencyLevel: input.urgencyLevel ?? null,
+        reportReference: input.reportReference ?? null,
+        targetContentType: input.targetContentType ?? null,
+        targetContentId: input.targetContentId ?? null,
+      });
+      res.status(201).json({ success: true, reportId: report.id });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
+      // Handle unique constraint violation (duplicate report) as a safety net
+      if ((error as any)?.code === '23505') {
+        return res.status(400).json({ message: "You have already submitted a report of this type against this user" });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // List all reports (admin only)
+  app.get("/api/admin/reports", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const validStatuses = ['pending', 'reviewed', 'dismissed', 'actioned'];
+      const statusParam = req.query.status as string | undefined;
+      const status = statusParam && validStatuses.includes(statusParam) ? statusParam : undefined;
+      const reports = await storage.listAllReports(status);
+      res.json(reports);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update report status (admin only)
+  app.patch("/api/admin/reports/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    const adminId = req.userId || req.oidc?.user?.sub;
+    const reportId = Number(req.params.id);
+    if (!Number.isInteger(reportId) || reportId <= 0) {
+      return res.status(400).json({ message: "Invalid report ID" });
+    }
+    try {
+      const schema = z.object({
+        status: z.enum(['pending', 'reviewed', 'dismissed', 'actioned']),
+        adminNotes: z.string().optional(),
+      });
+      const input = schema.parse(req.body);
+      const report = await storage.updateReportStatus(reportId, input.status, adminId, input.adminNotes);
+      if (!report) return res.status(404).json({ message: "Report not found" });
+      res.json(report);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // === EXTENSION ROUTES ===
 
   // Get all extensions
@@ -1108,10 +1189,18 @@ export async function registerRoutes(
     }
   });
 
-  // === COMMUNITY FORUMS ===
+  // === PUBLIC ENDPOINTS (no auth) ===
 
-  // List all categories
-  app.get("/api/forums/categories", isAuthenticated, async (req, res) => {
+  app.get("/api/public/stats", async (req, res) => {
+    try {
+      const stats = await storage.getPublicStats();
+      res.json(stats);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/public/categories", async (req, res) => {
     try {
       const categories = await storage.listForumCategories();
       res.json(categories);
@@ -1120,8 +1209,29 @@ export async function registerRoutes(
     }
   });
 
-  // Get category by slug
-  app.get("/api/forums/categories/:slug", isAuthenticated, async (req, res) => {
+  app.get("/api/public/activity", async (req, res) => {
+    try {
+      const activity = await storage.getPublicRecentActivity(10);
+      res.json(activity);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // === COMMUNITY FORUMS ===
+
+  // List all categories (public, no auth)
+  app.get("/api/forums/categories", async (req, res) => {
+    try {
+      const categories = await storage.listForumCategories();
+      res.json(categories);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Get category by slug (public, no auth)
+  app.get("/api/forums/categories/:slug", async (req, res) => {
     try {
       const cat = await storage.getForumCategory(req.params.slug);
       if (!cat) return res.status(404).json({ message: "Category not found" });
@@ -1131,8 +1241,8 @@ export async function registerRoutes(
     }
   });
 
-  // List threads in a category
-  app.get("/api/forums/categories/:slug/threads", isAuthenticated, async (req, res) => {
+  // List threads in a category (public, no auth)
+  app.get("/api/forums/categories/:slug/threads", async (req, res) => {
     try {
       const cat = await storage.getForumCategory(req.params.slug);
       if (!cat) return res.status(404).json({ message: "Category not found" });
@@ -1168,12 +1278,14 @@ export async function registerRoutes(
     }
   });
 
-  // Get thread detail with replies
-  app.get("/api/forums/threads/:id", isAuthenticated, async (req, res) => {
+  // Get thread detail with paginated replies (public, no auth)
+  app.get("/api/forums/threads/:id", async (req, res) => {
     try {
-      const thread = await storage.getForumThread(parseInt(req.params.id));
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+      const thread = await storage.getForumThread(parseInt(req.params.id), page, limit);
       if (!thread) return res.status(404).json({ message: "Thread not found" });
-      res.json(thread);
+      res.json({ ...thread, repliesPage: page, repliesLimit: limit });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -1203,10 +1315,11 @@ export async function registerRoutes(
       const userId = (req as any).userId || (req as any).oidc?.user?.sub;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const result = await storage.toggleForumVote(userId, "thread", parseInt(req.params.id));
-      if (result.voted) {
-        await storage.awardPoints({ userId, points: 2, actionType: "forum_upvote_given", description: "Upvoted a forum thread" });
+      // Award points to the thread author when they receive a net new upvote (not to the voter)
+      if (result.voted && result.recipientId && result.recipientId !== userId) {
+        await storage.awardPoints({ userId: result.recipientId, points: 2, actionType: "forum_upvote_received", description: "Received an upvote on a forum thread" });
       }
-      res.json(result);
+      res.json({ voted: result.voted, count: result.count });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -1218,7 +1331,11 @@ export async function registerRoutes(
       const userId = (req as any).userId || (req as any).oidc?.user?.sub;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const result = await storage.toggleForumVote(userId, "reply", parseInt(req.params.id));
-      res.json(result);
+      // Award points to the reply author when they receive a net new upvote (not to the voter)
+      if (result.voted && result.recipientId && result.recipientId !== userId) {
+        await storage.awardPoints({ userId: result.recipientId, points: 2, actionType: "forum_upvote_received", description: "Received an upvote on a forum reply" });
+      }
+      res.json({ voted: result.voted, count: result.count });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -1244,18 +1361,15 @@ export async function registerRoutes(
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const { threadId } = req.body;
       if (!threadId) return res.status(400).json({ message: "threadId required" });
-      await storage.markAcceptedAnswer(parseInt(threadId), parseInt(req.params.id), userId);
-      // Award points to the reply author
-      const thread = await storage.getForumThread(parseInt(threadId));
-      if (thread) {
-        const reply = thread.replies.find(r => r.id === parseInt(req.params.id));
-        if (reply) {
-          await storage.awardPoints({ userId: reply.authorId, points: 20, actionType: "accepted_answer", description: "Reply marked as accepted answer" });
-        }
+      const { replyAuthorId, wasAlreadyAccepted } = await storage.markAcceptedAnswer(parseInt(threadId), parseInt(req.params.id), userId);
+      // Only award points when transitioning from not-accepted to accepted (idempotent)
+      if (!wasAlreadyAccepted && replyAuthorId && replyAuthorId !== userId) {
+        await storage.awardPoints({ userId: replyAuthorId, points: 20, actionType: "accepted_answer", description: "Reply marked as accepted answer" });
       }
       res.json({ success: true });
     } catch (e: any) {
-      res.status(e.message === "Not authorized" ? 403 : 500).json({ message: e.message });
+      const status = e.message === "Not authorized" ? 403 : e.message === "Reply not found in this thread" ? 404 : 500;
+      res.status(status).json({ message: e.message });
     }
   });
 
