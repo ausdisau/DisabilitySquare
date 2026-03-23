@@ -7,6 +7,7 @@ import { formatDistanceToNow } from "date-fns";
 import { MessageSquare, ChevronLeft, ArrowUp, CheckCircle, Lightbulb, Clock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { ForumCategory, ForumThread } from "@shared/schema";
 
@@ -26,62 +27,81 @@ function ThreadRow({ thread, categorySlug, userVotedIds }: { thread: ThreadWithA
   });
 
   const authorName = `${thread.author.firstName || "Member"} ${thread.author.lastName || ""}`.trim();
+  const authorInitials = `${thread.author.firstName?.[0] || ""}${thread.author.lastName?.[0] || ""}`.toUpperCase();
 
   return (
-    <div className="retro-post" data-testid={`card-thread-${thread.id}`}>
-      <div className="retro-post-header">
-        <div className="flex-1 min-w-0 flex items-center gap-2">
-          {thread.isAdviceRequest && (
-            <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold bg-[#E07830]/10 text-[#E07830] border border-[#E07830]/30 rounded-sm">
-              <Lightbulb className="h-2.5 w-2.5" />Advice Request
-            </span>
-          )}
-          {thread.isSolved && (
-            <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold bg-[#2A9D8F]/10 text-[#2A9D8F] border border-[#2A9D8F]/30 rounded-sm">
-              <CheckCircle className="h-2.5 w-2.5" />Solved
-            </span>
-          )}
-          <Link href={`/forums/${categorySlug}/${thread.id}`}>
-            <span className="font-bold text-[#1B4B8A] hover:text-[#E07830] cursor-pointer truncate">{thread.title}</span>
-          </Link>
-        </div>
-        <div className="flex items-center gap-3 text-[10px] text-gray-400 shrink-0">
-          <span className="flex items-center gap-1">
-            <MessageSquare className="h-3 w-3" />{thread.replyCount}
-          </span>
-        </div>
-      </div>
-      <div className="retro-post-body py-1.5">
-        <p className="text-[12px] text-gray-600 line-clamp-2">{thread.body}</p>
-        {thread.tags && Array.isArray(thread.tags) && (thread.tags as string[]).length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {(thread.tags as string[]).map(tag => (
-              <span key={tag} className="retro-badge">{tag}</span>
-            ))}
+    <article className="sm-post" data-testid={`card-thread-${thread.id}`}>
+      <div className="px-4 pt-4 pb-3">
+        <div className="flex gap-3">
+          <Avatar className="h-8 w-8 rounded-full shrink-0 mt-0.5">
+            <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold rounded-full">
+              {authorInitials || "?"}
+            </AvatarFallback>
+          </Avatar>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 mb-1.5">
+              <span className="text-xs font-semibold text-foreground">{authorName}</span>
+              <span className="text-[11px] text-muted-foreground flex items-center gap-0.5 shrink-0">
+                <Clock className="h-2.5 w-2.5" />
+                {formatDistanceToNow(new Date(thread.lastActivityAt || thread.createdAt || new Date()), { addSuffix: true })}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+              {thread.isAdviceRequest && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-accent/10 text-accent rounded-full border border-accent/20">
+                  <Lightbulb className="h-2.5 w-2.5" />Advice Request
+                </span>
+              )}
+              {thread.isSolved && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-[#2A9D8F]/10 text-[#2A9D8F] rounded-full border border-[#2A9D8F]/20">
+                  <CheckCircle className="h-2.5 w-2.5" />Solved
+                </span>
+              )}
+            </div>
+
+            <Link href={`/forums/${categorySlug}/${thread.id}`}>
+              <h3 className="font-semibold text-foreground text-sm leading-snug hover:text-primary transition-colors cursor-pointer mb-1">
+                {thread.title}
+              </h3>
+            </Link>
+
+            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{thread.body}</p>
+
+            {thread.tags && Array.isArray(thread.tags) && (thread.tags as string[]).length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {(thread.tags as string[]).map(tag => (
+                  <span key={tag} className="sm-badge">{tag}</span>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 mt-3 -ml-1">
+              <button
+                onClick={() => user && voteMutation.mutate()}
+                disabled={voteMutation.isPending || !user}
+                data-testid={`button-vote-thread-${thread.id}`}
+                aria-label={`${voted ? "Remove upvote" : "Upvote"} (${thread.upvotesCount})`}
+                className={cn(
+                  "flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors",
+                  voted
+                    ? "text-accent font-bold bg-accent/10"
+                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                )}
+              >
+                <ArrowUp className="h-3.5 w-3.5" />
+                {thread.upvotesCount}
+              </button>
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <MessageSquare className="h-3.5 w-3.5" />
+                {thread.replyCount}
+              </span>
+            </div>
           </div>
-        )}
+        </div>
       </div>
-      <div className="retro-post-footer">
-        <button
-          onClick={() => user && voteMutation.mutate()}
-          disabled={voteMutation.isPending || !user}
-          data-testid={`button-vote-thread-${thread.id}`}
-          aria-label={`${voted ? "Remove upvote" : "Upvote"} (${thread.upvotesCount})`}
-          className={cn(
-            "flex items-center gap-1 text-[11px] transition-colors",
-            voted ? "text-[#E07830] font-bold" : "text-[#1B4B8A] hover:text-[#E07830]"
-          )}
-        >
-          <ArrowUp className="h-3 w-3" />
-          {thread.upvotesCount}
-        </button>
-        <span className="text-[10px] text-gray-400">by {authorName}</span>
-        <span className="ml-auto flex items-center gap-1 text-[10px] text-gray-400">
-          <Clock className="h-2.5 w-2.5" />
-          {formatDistanceToNow(new Date(thread.lastActivityAt || thread.createdAt || new Date()), { addSuffix: true })}
-        </span>
-      </div>
-    </div>
+    </article>
   );
 }
 
@@ -123,61 +143,70 @@ export default function ForumCategoryPage() {
         description={category?.description || "Community forum discussion threads"}
       />
 
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 mb-3 text-[12px]">
-        <Link href="/forums">
-          <span className="text-[#1B4B8A] hover:text-[#E07830] cursor-pointer flex items-center gap-1">
-            <ChevronLeft className="h-3 w-3" />Forums
-          </span>
-        </Link>
-        <span className="text-gray-400">/</span>
-        <span className="text-gray-600">{category?.name || slug}</span>
-      </div>
+      <div className="max-w-2xl">
+        <nav className="flex items-center gap-2 mb-4 text-xs" aria-label="Breadcrumb">
+          <Link href="/forums">
+            <span className="text-primary hover:text-primary/80 cursor-pointer flex items-center gap-1 font-medium">
+              <ChevronLeft className="h-3.5 w-3.5" />Forums
+            </span>
+          </Link>
+          <span className="text-muted-foreground">/</span>
+          <span className="text-muted-foreground">{category?.name || slug}</span>
+        </nav>
 
-      <div className="retro-box mb-3">
-        <div className="retro-box-header">
-          <MessageSquare className="h-3 w-3" />
-          {category?.name || slug}
-          <span className="ml-auto font-normal normal-case tracking-normal text-blue-200 text-[10px]">
-            {threads?.length || 0} threads · latest activity first
-          </span>
+        <div className="sm-card mb-4">
+          <div className="sm-card-title">
+            <MessageSquare className="h-4 w-4 text-primary" />
+            {category?.name || slug}
+            <span className="ml-auto text-[10px] font-normal text-muted-foreground">
+              {threads?.length || 0} threads
+            </span>
+          </div>
+          {category && (
+            <div className="sm-card-body pt-1 flex items-center justify-between gap-4">
+              <p className="text-xs text-muted-foreground leading-relaxed">{category.description}</p>
+              <CreateThreadDialog categories={allCategories || []} defaultCategorySlug={slug} />
+            </div>
+          )}
         </div>
-        {category && (
-          <div className="retro-box-content py-2 flex items-center justify-between">
-            <p className="text-[12px] text-gray-600">{category.description}</p>
-            <CreateThreadDialog categories={allCategories || []} defaultCategorySlug={slug} />
+
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="sm-post animate-pulse p-4">
+                <div className="flex gap-3">
+                  <div className="h-8 w-8 rounded-full bg-muted shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-muted rounded-full w-1/4" />
+                    <div className="h-4 bg-muted rounded-full w-3/4" />
+                    <div className="h-3 bg-muted rounded-full w-full" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : threads?.length === 0 ? (
+          <div className="sm-card">
+            <div className="sm-card-body text-center py-10">
+              <p className="text-sm text-muted-foreground mb-4">
+                No threads yet in this category. Be the first to start one!
+              </p>
+              <CreateThreadDialog categories={allCategories || []} defaultCategorySlug={slug} />
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {threads?.map(thread => (
+              <ThreadRow
+                key={thread.id}
+                thread={thread}
+                categorySlug={slug}
+                userVotedIds={userVotedIds}
+              />
+            ))}
           </div>
         )}
       </div>
-
-      {isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="retro-post animate-pulse">
-              <div className="retro-post-header h-8 bg-[#eef2f8]" />
-              <div className="retro-post-body h-10" />
-            </div>
-          ))}
-        </div>
-      ) : threads?.length === 0 ? (
-        <div className="retro-box">
-          <div className="retro-box-content text-center py-8">
-            <p className="text-[13px] text-gray-500 mb-3">No threads yet in this category. Be the first to start one!</p>
-            <CreateThreadDialog categories={allCategories || []} defaultCategorySlug={slug} />
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {threads?.map(thread => (
-            <ThreadRow
-              key={thread.id}
-              thread={thread}
-              categorySlug={slug}
-              userVotedIds={userVotedIds}
-            />
-          ))}
-        </div>
-      )}
     </Layout>
   );
 }

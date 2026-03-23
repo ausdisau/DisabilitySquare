@@ -23,19 +23,21 @@ type ThreadDetail = ForumThread & {
   category?: ForumCategory;
 };
 
-function AuthorAvatar({ author }: { author: { firstName: string | null; lastName: string | null; profileImageUrl: string | null } }) {
+function AuthorAvatar({ author, size = "sm" }: { author: { firstName: string | null; lastName: string | null; profileImageUrl: string | null }; size?: "sm" | "md" }) {
   const initials = `${author.firstName?.[0] || ""}${author.lastName?.[0] || ""}`.toUpperCase();
+  const sizeClass = size === "md" ? "h-10 w-10" : "h-8 w-8";
   return (
-    <Avatar className="h-7 w-7 shrink-0 rounded-sm border border-[#b0b8c8]">
+    <Avatar className={`${sizeClass} shrink-0 rounded-full`}>
       <AvatarImage src={author.profileImageUrl || undefined} />
-      <AvatarFallback className="bg-[#1B4B8A] text-white text-[10px] font-bold rounded-sm">{initials || "?"}</AvatarFallback>
+      <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold rounded-full">
+        {initials || "?"}
+      </AvatarFallback>
     </Avatar>
   );
 }
 
 function ReplyCard({
   reply,
-  threadId,
   isThreadAuthor,
   isAdviceRequest,
   userVotedReplyIds,
@@ -54,63 +56,67 @@ function ReplyCard({
   const authorName = `${reply.author.firstName || "Member"} ${reply.author.lastName || ""}`.trim();
 
   return (
-    <div
+    <article
       className={cn(
-        "retro-post",
-        reply.isAcceptedAnswer && "border-[#2A9D8F] bg-[#2A9D8F]/5"
+        "sm-post",
+        reply.isAcceptedAnswer && "ring-2 ring-[#2A9D8F]/40 bg-[#2A9D8F]/3"
       )}
       data-testid={`card-reply-${reply.id}`}
     >
       {reply.isAcceptedAnswer && (
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2A9D8F] text-white text-[11px] font-bold">
-          <CheckCircle className="h-3 w-3" />
-          Accepted Answer
+        <div className="flex items-center gap-1.5 px-4 py-2 bg-[#2A9D8F]/10 border-b border-[#2A9D8F]/20 rounded-t-2xl">
+          <CheckCircle className="h-3.5 w-3.5 text-[#2A9D8F]" />
+          <span className="text-xs font-semibold text-[#2A9D8F]">Accepted Answer</span>
         </div>
       )}
-      <div className="retro-post-header">
-        <AuthorAvatar author={reply.author} />
-        <div className="flex-1 min-w-0">
-          <span className="font-bold text-[#1B4B8A] text-sm">{authorName}</span>
-          <span className="text-gray-400 text-[11px] ml-2">
-            {formatDistanceToNow(new Date(reply.createdAt || new Date()), { addSuffix: true })}
-          </span>
+      <div className="px-4 pt-3 pb-3">
+        <div className="flex gap-3">
+          <AuthorAvatar author={reply.author} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 mb-2">
+              <span className="text-sm font-semibold text-foreground">{authorName}</span>
+              <span className="text-xs text-muted-foreground">
+                {formatDistanceToNow(new Date(reply.createdAt || new Date()), { addSuffix: true })}
+              </span>
+            </div>
+            <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{reply.body}</p>
+            {reply.mediaUrls && reply.mediaUrls.length > 0 && (
+              <div className="mt-2 flex gap-2 flex-wrap">
+                {reply.mediaUrls.map((url, i) => (
+                  <img key={i} src={url} alt={`attachment ${i + 1}`} className="h-24 w-24 object-cover rounded-xl border border-border/50" />
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2 mt-3 -ml-1">
+              <button
+                onClick={() => onVote(reply.id)}
+                data-testid={`button-vote-reply-${reply.id}`}
+                aria-label={`${voted ? "Remove upvote" : "Upvote"} (${reply.upvotesCount})`}
+                className={cn(
+                  "flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors",
+                  voted
+                    ? "text-accent font-bold bg-accent/10"
+                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                )}
+              >
+                <ArrowUp className="h-3.5 w-3.5" />
+                {reply.upvotesCount}
+              </button>
+              {isThreadAuthor && isAdviceRequest && !reply.isAcceptedAnswer && (
+                <button
+                  onClick={() => onAccept(reply.id)}
+                  data-testid={`button-accept-reply-${reply.id}`}
+                  className="flex items-center gap-1 text-xs text-[#2A9D8F] hover:text-[#228177] font-medium px-2 py-1 rounded-full hover:bg-[#2A9D8F]/10 transition-colors"
+                >
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  Mark as Answer
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-      <div className="retro-post-body">
-        <p className="text-[13px] text-gray-800 whitespace-pre-wrap leading-relaxed">{reply.body}</p>
-        {reply.mediaUrls && reply.mediaUrls.length > 0 && (
-          <div className="mt-2 flex gap-2 flex-wrap">
-            {reply.mediaUrls.map((url, i) => (
-              <img key={i} src={url} alt={`attachment ${i + 1}`} className="h-24 w-24 object-cover rounded border border-gray-200" />
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="retro-post-footer">
-        <button
-          onClick={() => onVote(reply.id)}
-          data-testid={`button-vote-reply-${reply.id}`}
-          aria-label={`${voted ? "Remove upvote" : "Upvote"} (${reply.upvotesCount})`}
-          className={cn(
-            "flex items-center gap-1 text-[11px] transition-colors",
-            voted ? "text-[#E07830] font-bold" : "text-[#1B4B8A] hover:text-[#E07830]"
-          )}
-        >
-          <ArrowUp className="h-3 w-3" />
-          {reply.upvotesCount}
-        </button>
-        {isThreadAuthor && isAdviceRequest && !reply.isAcceptedAnswer && (
-          <button
-            onClick={() => onAccept(reply.id)}
-            data-testid={`button-accept-reply-${reply.id}`}
-            className="flex items-center gap-1 text-[11px] text-[#2A9D8F] hover:text-[#228177] font-medium"
-          >
-            <CheckCircle className="h-3 w-3" />
-            Mark as Answer
-          </button>
-        )}
-      </div>
-    </div>
+    </article>
   );
 }
 
@@ -189,7 +195,6 @@ export default function ForumThreadPage() {
   const isThreadAuthor = !!user && thread?.authorId === user.id;
   const authorName = thread ? `${thread.author.firstName || "Member"} ${thread.author.lastName || ""}`.trim() : "";
 
-  // Partition replies: accepted first, rest chronological
   const acceptedReplies = thread?.replies.filter(r => r.isAcceptedAnswer) || [];
   const otherReplies = thread?.replies.filter(r => !r.isAcceptedAnswer) || [];
 
@@ -200,163 +205,189 @@ export default function ForumThreadPage() {
         description={thread?.body?.slice(0, 160) || "Community forum discussion"}
       />
 
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 mb-3 text-[12px]">
-        <Link href="/forums">
-          <span className="text-[#1B4B8A] hover:text-[#E07830] cursor-pointer flex items-center gap-1">
-            <ChevronLeft className="h-3 w-3" />Forums
-          </span>
-        </Link>
-        <span className="text-gray-400">/</span>
-        <Link href={`/forums/${slug}`}>
-          <span className="text-[#1B4B8A] hover:text-[#E07830] cursor-pointer">{slug}</span>
-        </Link>
-        <span className="text-gray-400">/</span>
-        <span className="text-gray-600 truncate max-w-[200px]">{thread?.title || "Thread"}</span>
+      <div className="max-w-2xl">
+        <nav className="flex items-center gap-2 mb-4 text-xs" aria-label="Breadcrumb">
+          <Link href="/forums">
+            <span className="text-primary hover:text-primary/80 cursor-pointer flex items-center gap-1 font-medium">
+              <ChevronLeft className="h-3.5 w-3.5" />Forums
+            </span>
+          </Link>
+          <span className="text-muted-foreground">/</span>
+          <Link href={`/forums/${slug}`}>
+            <span className="text-primary hover:text-primary/80 cursor-pointer font-medium">{slug}</span>
+          </Link>
+          <span className="text-muted-foreground">/</span>
+          <span className="text-muted-foreground truncate max-w-[160px]">{thread?.title || "Thread"}</span>
+        </nav>
+
+        {isLoading ? (
+          <div className="space-y-3">
+            <div className="sm-post animate-pulse p-4">
+              <div className="flex gap-3">
+                <div className="h-10 w-10 rounded-full bg-muted shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-muted rounded-full w-1/4" />
+                  <div className="h-5 bg-muted rounded-full w-3/4" />
+                  <div className="h-16 bg-muted rounded-xl" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : thread ? (
+          <div className="space-y-3">
+            {/* Original post */}
+            <article className="sm-post" data-testid={`card-thread-detail-${thread.id}`}>
+              <div className="px-4 pt-4 pb-3">
+                <div className="flex gap-3">
+                  <AuthorAvatar author={thread.author} size="md" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-1.5">
+                      <span className="text-sm font-semibold text-foreground">{authorName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(thread.createdAt || new Date()), { addSuffix: true })}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                      {thread.isAdviceRequest && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-accent/10 text-accent rounded-full border border-accent/20">
+                          <Lightbulb className="h-2.5 w-2.5" />Advice Request
+                        </span>
+                      )}
+                      {thread.isSolved && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-[#2A9D8F]/10 text-[#2A9D8F] rounded-full border border-[#2A9D8F]/20">
+                          <CheckCircle className="h-2.5 w-2.5" />Solved
+                        </span>
+                      )}
+                    </div>
+
+                    <h1 className="font-bold text-foreground text-base leading-snug mb-2">{thread.title}</h1>
+                    <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{thread.body}</p>
+
+                    {thread.mediaUrls && thread.mediaUrls.length > 0 && (
+                      <div className="mt-3 flex gap-2 flex-wrap">
+                        {thread.mediaUrls.map((url, i) => (
+                          <img key={i} src={url} alt={`attachment ${i + 1}`} className="h-32 w-32 object-cover rounded-xl border border-border/50" />
+                        ))}
+                      </div>
+                    )}
+                    {thread.tags && Array.isArray(thread.tags) && (thread.tags as string[]).length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {(thread.tags as string[]).map(tag => (
+                          <span key={tag} className="sm-badge">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3 mt-3 -ml-1">
+                      <button
+                        onClick={() => voteMutation.mutate({ entityType: "thread", entityId: thread.id })}
+                        disabled={voteMutation.isPending || !user}
+                        data-testid={`button-vote-thread-${thread.id}`}
+                        aria-label={`${userVotedThread ? "Remove upvote" : "Upvote"} (${thread.upvotesCount})`}
+                        className={cn(
+                          "flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors",
+                          userVotedThread
+                            ? "text-accent font-bold bg-accent/10"
+                            : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                        )}
+                      >
+                        <ArrowUp className="h-3.5 w-3.5" />
+                        {thread.upvotesCount} upvote{thread.upvotesCount !== 1 ? "s" : ""}
+                      </button>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        {thread.replyCount} repl{thread.replyCount !== 1 ? "ies" : "y"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            {/* Accepted answers pinned first */}
+            {acceptedReplies.map(reply => (
+              <ReplyCard
+                key={reply.id}
+                reply={reply}
+                threadId={thread.id}
+                isThreadAuthor={isThreadAuthor}
+                isAdviceRequest={thread.isAdviceRequest}
+                userVotedReplyIds={userVotedReplyIds}
+                onVote={id => voteMutation.mutate({ entityType: "reply", entityId: id })}
+                onAccept={id => acceptMutation.mutate(id)}
+              />
+            ))}
+
+            {acceptedReplies.length > 0 && otherReplies.length > 0 && (
+              <div className="flex items-center gap-3 px-1 py-1">
+                <div className="h-px flex-1 bg-border/40" />
+                <span className="text-[11px] text-muted-foreground">Other replies</span>
+                <div className="h-px flex-1 bg-border/40" />
+              </div>
+            )}
+
+            {/* Regular replies */}
+            {otherReplies.map(reply => (
+              <ReplyCard
+                key={reply.id}
+                reply={reply}
+                threadId={thread.id}
+                isThreadAuthor={isThreadAuthor}
+                isAdviceRequest={thread.isAdviceRequest}
+                userVotedReplyIds={userVotedReplyIds}
+                onVote={id => voteMutation.mutate({ entityType: "reply", entityId: id })}
+                onAccept={id => acceptMutation.mutate(id)}
+              />
+            ))}
+
+            {/* Reply composer */}
+            {user ? (
+              <div className="sm-card">
+                <div className="sm-card-title">
+                  <MessageSquare className="h-4 w-4 text-primary" />
+                  Leave a reply
+                </div>
+                <div className="sm-card-body pt-2">
+                  <Textarea
+                    value={replyBody}
+                    onChange={e => setReplyBody(e.target.value)}
+                    placeholder="Share your thoughts, experience, or advice..."
+                    rows={4}
+                    className="text-sm mb-3 resize-none"
+                    data-testid="input-reply-body"
+                  />
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Thoughtful replies (100+ chars) earn bonus points.
+                    </p>
+                    <Button
+                      onClick={() => replyMutation.mutate()}
+                      disabled={replyMutation.isPending || !replyBody.trim()}
+                      className="text-xs h-9 px-5 rounded-full bg-primary hover:bg-primary/90"
+                      data-testid="button-submit-reply"
+                    >
+                      {replyMutation.isPending ? "Posting…" : "Post Reply"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="sm-card">
+                <div className="sm-card-body text-center py-6">
+                  <p className="text-sm text-muted-foreground">Sign in to leave a reply.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="sm-card">
+            <div className="sm-card-body text-center py-12">
+              <p className="text-muted-foreground text-sm">Thread not found.</p>
+            </div>
+          </div>
+        )}
       </div>
-
-      {isLoading ? (
-        <div className="space-y-2">
-          <div className="retro-post animate-pulse">
-            <div className="retro-post-header h-8 bg-[#eef2f8]" />
-            <div className="retro-post-body h-20" />
-          </div>
-        </div>
-      ) : thread ? (
-        <div className="space-y-2">
-          {/* Original post */}
-          <article className="retro-post" data-testid={`card-thread-detail-${thread.id}`}>
-            <div className="retro-post-header">
-              <AuthorAvatar author={thread.author} />
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  {thread.isAdviceRequest && (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold bg-[#E07830]/10 text-[#E07830] border border-[#E07830]/30 rounded-sm">
-                      <Lightbulb className="h-2.5 w-2.5" />Advice Request
-                    </span>
-                  )}
-                  {thread.isSolved && (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold bg-[#2A9D8F]/10 text-[#2A9D8F] border border-[#2A9D8F]/30 rounded-sm">
-                      <CheckCircle className="h-2.5 w-2.5" />Solved
-                    </span>
-                  )}
-                </div>
-                <h1 className="font-bold text-[#1B4B8A] text-[14px] leading-tight mt-0.5">{thread.title}</h1>
-                <span className="text-gray-400 text-[11px]">
-                  by {authorName} · {formatDistanceToNow(new Date(thread.createdAt || new Date()), { addSuffix: true })}
-                </span>
-              </div>
-            </div>
-            <div className="retro-post-body">
-              <p className="text-[13px] text-gray-800 whitespace-pre-wrap leading-relaxed">{thread.body}</p>
-              {thread.mediaUrls && thread.mediaUrls.length > 0 && (
-                <div className="mt-2 flex gap-2 flex-wrap">
-                  {thread.mediaUrls.map((url, i) => (
-                    <img key={i} src={url} alt={`attachment ${i + 1}`} className="h-32 w-32 object-cover rounded border border-gray-200" />
-                  ))}
-                </div>
-              )}
-              {thread.tags && Array.isArray(thread.tags) && (thread.tags as string[]).length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {(thread.tags as string[]).map(tag => (
-                    <span key={tag} className="retro-badge">{tag}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="retro-post-footer">
-              <button
-                onClick={() => voteMutation.mutate({ entityType: "thread", entityId: thread.id })}
-                disabled={voteMutation.isPending || !user}
-                data-testid={`button-vote-thread-${thread.id}`}
-                className={cn(
-                  "flex items-center gap-1 text-[11px] transition-colors",
-                  userVotedThread ? "text-[#E07830] font-bold" : "text-[#1B4B8A] hover:text-[#E07830]"
-                )}
-              >
-                <ArrowUp className="h-3 w-3" />
-                {thread.upvotesCount} upvote{thread.upvotesCount !== 1 ? "s" : ""}
-              </button>
-              <span className="flex items-center gap-1 text-[11px] text-gray-500">
-                <MessageSquare className="h-3 w-3" />{thread.replyCount} repl{thread.replyCount !== 1 ? "ies" : "y"}
-              </span>
-            </div>
-          </article>
-
-          {/* Accepted answers pinned first */}
-          {acceptedReplies.map(reply => (
-            <ReplyCard
-              key={reply.id}
-              reply={reply}
-              threadId={thread.id}
-              isThreadAuthor={isThreadAuthor}
-              isAdviceRequest={thread.isAdviceRequest}
-              userVotedReplyIds={userVotedReplyIds}
-              onVote={id => voteMutation.mutate({ entityType: "reply", entityId: id })}
-              onAccept={id => acceptMutation.mutate(id)}
-            />
-          ))}
-
-          {/* Regular replies */}
-          {otherReplies.map(reply => (
-            <ReplyCard
-              key={reply.id}
-              reply={reply}
-              threadId={thread.id}
-              isThreadAuthor={isThreadAuthor}
-              isAdviceRequest={thread.isAdviceRequest}
-              userVotedReplyIds={userVotedReplyIds}
-              onVote={id => voteMutation.mutate({ entityType: "reply", entityId: id })}
-              onAccept={id => acceptMutation.mutate(id)}
-            />
-          ))}
-
-          {/* Reply composer */}
-          {user ? (
-            <div className="retro-box">
-              <div className="retro-box-header">
-                <MessageSquare className="h-3 w-3" />
-                Leave a reply
-              </div>
-              <div className="retro-box-content">
-                <Textarea
-                  value={replyBody}
-                  onChange={e => setReplyBody(e.target.value)}
-                  placeholder="Share your thoughts, experience, or advice..."
-                  rows={4}
-                  className="text-[13px] border-[#c8d0dc] mb-2"
-                  data-testid="input-reply-body"
-                />
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-gray-400">
-                    Thoughtful replies (100+ chars) earn bonus points.
-                  </p>
-                  <Button
-                    onClick={() => replyMutation.mutate()}
-                    disabled={replyMutation.isPending || !replyBody.trim()}
-                    className="bg-[#1B4B8A] hover:bg-[#163d75] text-white text-[12px] h-8 px-4"
-                    data-testid="button-submit-reply"
-                  >
-                    {replyMutation.isPending ? "Posting…" : "Post Reply"}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="retro-box">
-              <div className="retro-box-content text-center py-4">
-                <p className="text-[12px] text-gray-500">Sign in to leave a reply.</p>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="retro-box">
-          <div className="retro-box-content text-center py-8">
-            <p className="text-gray-500 text-[13px]">Thread not found.</p>
-          </div>
-        </div>
-      )}
     </Layout>
   );
 }
