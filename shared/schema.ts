@@ -456,6 +456,165 @@ export const insertUserReportSchema = createInsertSchema(userReports).omit({
 export type UserReport = typeof userReports.$inferSelect;
 export type InsertUserReport = z.infer<typeof insertUserReportSchema>;
 
+// === SPOON STATUS (Spoon Theory Energy Tracker) ===
+export const spoonStatus = pgTable("spoon_status", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  spoons: integer("spoons").notNull(), // 1-12
+  note: text("note"), // optional note
+  date: text("date").notNull(), // 'YYYY-MM-DD' format for easy daily grouping
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const spoonStatusRelations = relations(spoonStatus, ({ one }) => ({
+  user: one(users, {
+    fields: [spoonStatus.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertSpoonStatusSchema = createInsertSchema(spoonStatus).omit({ id: true, userId: true, createdAt: true });
+export type SpoonStatus = typeof spoonStatus.$inferSelect;
+export type InsertSpoonStatus = z.infer<typeof insertSpoonStatusSchema>;
+
+// === SYMPTOM/MOOD JOURNAL ===
+export const journalEntries = pgTable("journal_entries", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  date: text("date").notNull(), // 'YYYY-MM-DD'
+  mood: integer("mood").notNull(), // 1-5 scale
+  symptoms: jsonb("symptoms").$type<string[]>().default([]),
+  painLevel: integer("pain_level"), // 0-10, optional
+  energyLevel: integer("energy_level"), // 1-10, optional
+  notes: text("notes"),
+  isPrivate: boolean("is_private").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const journalEntriesRelations = relations(journalEntries, ({ one }) => ({
+  user: one(users, {
+    fields: [journalEntries.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertJournalEntrySchema = createInsertSchema(journalEntries).omit({ id: true, userId: true, createdAt: true, updatedAt: true });
+export type JournalEntry = typeof journalEntries.$inferSelect;
+export type InsertJournalEntry = z.infer<typeof insertJournalEntrySchema>;
+
+// === SERVICE PROVIDER DIRECTORY ===
+export const serviceProviders = pgTable("service_providers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  category: text("category").notNull(), // 'allied_health', 'support_worker', 'accommodation', 'employment', 'legal', 'mental_health', 'equipment', 'other'
+  description: text("description").notNull(),
+  location: text("location").notNull(),
+  state: text("state").notNull(), // AU state or 'National' or 'Online'
+  phone: text("phone"),
+  email: text("email"),
+  website: text("website"),
+  ndisRegistered: boolean("ndis_registered").default(false),
+  acceptsNdis: boolean("accepts_ndis").default(false),
+  disabilityTypes: jsonb("disability_types").$type<string[]>().default([]),
+  approved: boolean("approved").default(false), // Admin approved
+  submittedById: varchar("submitted_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const serviceProvidersRelations = relations(serviceProviders, ({ one }) => ({
+  submittedBy: one(users, {
+    fields: [serviceProviders.submittedById],
+    references: [users.id],
+  }),
+}));
+
+export const insertServiceProviderSchema = createInsertSchema(serviceProviders).omit({ id: true, submittedById: true, approved: true, createdAt: true });
+export type ServiceProvider = typeof serviceProviders.$inferSelect;
+export type InsertServiceProvider = z.infer<typeof insertServiceProviderSchema>;
+
+// === RESOURCE LIBRARY ===
+export const resources = pgTable("resources", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  url: text("url").notNull(),
+  category: text("category").notNull(), // 'ndis', 'mental_health', 'employment', 'legal', 'housing', 'community', 'research', 'tools'
+  tags: jsonb("tags").$type<string[]>().default([]),
+  source: text("source").notNull(), // Publisher/organisation name
+  isAustralian: boolean("is_australian").default(true),
+  addedById: varchar("added_by_id").references(() => users.id),
+  approved: boolean("approved").default(false),
+  saves: integer("saves").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const resourcesRelations = relations(resources, ({ one }) => ({
+  addedBy: one(users, {
+    fields: [resources.addedById],
+    references: [users.id],
+  }),
+}));
+
+export const insertResourceSchema = createInsertSchema(resources).omit({ id: true, addedById: true, approved: true, saves: true, createdAt: true });
+export type Resource = typeof resources.$inferSelect;
+export type InsertResource = z.infer<typeof insertResourceSchema>;
+
+// User saved resources (bookmarks)
+export const savedResources = pgTable("saved_resources", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  resourceId: integer("resource_id").notNull().references(() => resources.id),
+  savedAt: timestamp("saved_at").defaultNow(),
+}, (table) => ({
+  uniqueSave: unique("unique_save").on(table.userId, table.resourceId),
+}));
+
+export const savedResourcesRelations = relations(savedResources, ({ one }) => ({
+  user: one(users, {
+    fields: [savedResources.userId],
+    references: [users.id],
+  }),
+  resource: one(resources, {
+    fields: [savedResources.resourceId],
+    references: [resources.id],
+  }),
+}));
+
+// === JOB BOARD ===
+export const jobListings = pgTable("job_listings", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  company: text("company").notNull(),
+  description: text("description").notNull(),
+  location: text("location").notNull(),
+  state: text("state").notNull(),
+  type: text("type").notNull(), // 'full_time', 'part_time', 'casual', 'volunteer', 'contract'
+  salary: text("salary"), // Optional salary range as text
+  category: text("category").notNull(), // 'admin', 'healthcare', 'tech', 'creative', 'education', 'retail', 'trades', 'other'
+  tags: jsonb("tags").$type<string[]>().default([]),
+  isRemote: boolean("is_remote").default(false),
+  isAccessible: boolean("is_accessible").default(false), // Employer confirmed accessible workplace
+  disabilityWelcome: boolean("disability_welcome").default(false), // Explicitly welcoming people with disabilities
+  applyUrl: text("apply_url"),
+  applyEmail: text("apply_email"),
+  expiresAt: timestamp("expires_at"),
+  postedById: varchar("posted_by_id").references(() => users.id),
+  approved: boolean("approved").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const jobListingsRelations = relations(jobListings, ({ one }) => ({
+  postedBy: one(users, {
+    fields: [jobListings.postedById],
+    references: [users.id],
+  }),
+}));
+
+export const insertJobListingSchema = createInsertSchema(jobListings).omit({ id: true, postedById: true, approved: true, createdAt: true });
+export type JobListing = typeof jobListings.$inferSelect;
+export type InsertJobListing = z.infer<typeof insertJobListingSchema>;
+
 // === AI CHAT CONVERSATIONS (for voice features) ===
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),

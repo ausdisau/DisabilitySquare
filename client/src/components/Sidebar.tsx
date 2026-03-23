@@ -13,7 +13,12 @@ import {
   Star,
   Puzzle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Spline,
+  BookOpen,
+  Building2,
+  BookMarked,
+  Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +36,11 @@ export function Sidebar() {
   const navItems = [
     { href: "/", label: "Village Square", icon: Home },
     { href: "/groups", label: "Groups", icon: Users },
+    { href: "/spoons", label: "Spoon Tracker", icon: Spline },
+    { href: "/journal", label: "Health Journal", icon: BookOpen },
+    { href: "/providers", label: "Services", icon: Building2 },
+    { href: "/resources", label: "Resources", icon: BookMarked },
+    { href: "/jobs", label: "Jobs", icon: Briefcase },
     { href: "/recognition", label: "Recognition", icon: Trophy },
     { href: "/games", label: "Games", icon: Gamepad2 },
     { href: "/extensions", label: "Extensions", icon: Puzzle },

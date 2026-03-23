@@ -1,8 +1,9 @@
 import { db } from "./db";
-import { eq, desc, and, sql, sum } from "drizzle-orm";
+import { eq, desc, and, sql, sum, gte, lte } from "drizzle-orm";
 import { 
   users, profiles, groups, posts, comments, gameScores, groupMembers,
   badges, userBadges, pointsLedger, userPoints, userReports,
+  spoonStatus, journalEntries, serviceProviders, resources, savedResources, jobListings,
   type User, type InsertUser,
   type Profile, type InsertProfile,
   type Group, type InsertGroup,
@@ -14,6 +15,11 @@ import {
   type PointsLedgerEntry, type InsertPointsLedgerEntry,
   type UserPoints, type InsertUserPoints,
   type UserReport, type InsertUserReport,
+  type SpoonStatus, type InsertSpoonStatus,
+  type JournalEntry, type InsertJournalEntry,
+  type ServiceProvider, type InsertServiceProvider,
+  type Resource, type InsertResource,
+  type JobListing, type InsertJobListing,
   POINT_VALUES
 } from "@shared/schema";
 
@@ -58,6 +64,36 @@ export interface IStorage {
   createUserReport(report: InsertUserReport): Promise<UserReport>;
   getUserReports(userId: string): Promise<UserReport[]>;
   hasReportedUser(reporterId: string, reportedUserId: string, reportType: string): Promise<boolean>;
+
+  // Spoon Status
+  setSpoonStatus(userId: string, data: InsertSpoonStatus): Promise<SpoonStatus>;
+  getSpoonStatus(userId: string, date: string): Promise<SpoonStatus | undefined>;
+  getSpoonHistory(userId: string, days?: number): Promise<SpoonStatus[]>;
+
+  // Journal
+  upsertJournalEntry(userId: string, data: InsertJournalEntry): Promise<JournalEntry>;
+  getJournalEntry(userId: string, date: string): Promise<JournalEntry | undefined>;
+  listJournalEntries(userId: string, limit?: number): Promise<JournalEntry[]>;
+
+  // Service Providers
+  listServiceProviders(filters?: { category?: string; state?: string; ndisRegistered?: boolean; search?: string }): Promise<ServiceProvider[]>;
+  getServiceProvider(id: number): Promise<ServiceProvider | undefined>;
+  createServiceProvider(data: InsertServiceProvider, submittedById: string): Promise<ServiceProvider>;
+  approveServiceProvider(id: number): Promise<void>;
+
+  // Resources
+  listResources(filters?: { category?: string; search?: string }): Promise<Resource[]>;
+  getResource(id: number): Promise<Resource | undefined>;
+  createResource(data: InsertResource, addedById: string): Promise<Resource>;
+  approveResource(id: number): Promise<void>;
+  toggleSaveResource(userId: string, resourceId: number): Promise<{ saved: boolean }>;
+  getSavedResourceIds(userId: string): Promise<number[]>;
+
+  // Job Listings
+  listJobListings(filters?: { category?: string; state?: string; type?: string; isRemote?: boolean; search?: string }): Promise<JobListing[]>;
+  getJobListing(id: number): Promise<JobListing | undefined>;
+  createJobListing(data: InsertJobListing, postedById: string): Promise<JobListing>;
+  approveJobListing(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -306,6 +342,151 @@ export class DatabaseStorage implements IStorage {
       )
     );
     return existing.length > 0;
+  }
+
+  // === SPOON STATUS ===
+  async setSpoonStatus(userId: string, data: InsertSpoonStatus): Promise<SpoonStatus> {
+    const existing = await this.getSpoonStatus(userId, data.date);
+    if (existing) {
+      const [updated] = await db.update(spoonStatus)
+        .set({ spoons: data.spoons, note: data.note })
+        .where(and(eq(spoonStatus.userId, userId), eq(spoonStatus.date, data.date)))
+        .returning();
+      return updated;
+    }
+    const [newEntry] = await db.insert(spoonStatus).values({ ...data, userId }).returning();
+    return newEntry;
+  }
+
+  async getSpoonStatus(userId: string, date: string): Promise<SpoonStatus | undefined> {
+    const [entry] = await db.select().from(spoonStatus)
+      .where(and(eq(spoonStatus.userId, userId), eq(spoonStatus.date, date)));
+    return entry;
+  }
+
+  async getSpoonHistory(userId: string, days: number = 30): Promise<SpoonStatus[]> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+    return await db.select().from(spoonStatus)
+      .where(and(eq(spoonStatus.userId, userId), gte(spoonStatus.date, cutoffStr)))
+      .orderBy(desc(spoonStatus.date));
+  }
+
+  // === JOURNAL ===
+  async upsertJournalEntry(userId: string, data: InsertJournalEntry): Promise<JournalEntry> {
+    const existing = await this.getJournalEntry(userId, data.date);
+    if (existing) {
+      const [updated] = await db.update(journalEntries)
+        .set({ ...data, updatedAt: new Date() })
+        .where(and(eq(journalEntries.userId, userId), eq(journalEntries.date, data.date)))
+        .returning();
+      return updated;
+    }
+    const [newEntry] = await db.insert(journalEntries).values({ ...data, userId }).returning();
+    return newEntry;
+  }
+
+  async getJournalEntry(userId: string, date: string): Promise<JournalEntry | undefined> {
+    const [entry] = await db.select().from(journalEntries)
+      .where(and(eq(journalEntries.userId, userId), eq(journalEntries.date, date)));
+    return entry;
+  }
+
+  async listJournalEntries(userId: string, limit: number = 30): Promise<JournalEntry[]> {
+    return await db.select().from(journalEntries)
+      .where(eq(journalEntries.userId, userId))
+      .orderBy(desc(journalEntries.date))
+      .limit(limit);
+  }
+
+  // === SERVICE PROVIDERS ===
+  async listServiceProviders(filters?: { category?: string; state?: string; ndisRegistered?: boolean; search?: string }): Promise<ServiceProvider[]> {
+    const conditions = [eq(serviceProviders.approved, true)];
+    if (filters?.category) conditions.push(eq(serviceProviders.category, filters.category));
+    if (filters?.state) conditions.push(eq(serviceProviders.state, filters.state));
+    if (filters?.ndisRegistered !== undefined) conditions.push(eq(serviceProviders.ndisRegistered, filters.ndisRegistered));
+    if (filters?.search) conditions.push(sql`${serviceProviders.name} ILIKE ${`%${filters.search}%`}`);
+    return await db.select().from(serviceProviders).where(and(...conditions)).orderBy(serviceProviders.name);
+  }
+
+  async getServiceProvider(id: number): Promise<ServiceProvider | undefined> {
+    const [provider] = await db.select().from(serviceProviders).where(eq(serviceProviders.id, id));
+    return provider;
+  }
+
+  async createServiceProvider(data: InsertServiceProvider, submittedById: string): Promise<ServiceProvider> {
+    const [newProvider] = await db.insert(serviceProviders).values({ ...data, submittedById, approved: false }).returning();
+    return newProvider;
+  }
+
+  async approveServiceProvider(id: number): Promise<void> {
+    await db.update(serviceProviders).set({ approved: true }).where(eq(serviceProviders.id, id));
+  }
+
+  // === RESOURCES ===
+  async listResources(filters?: { category?: string; search?: string }): Promise<Resource[]> {
+    const conditions = [eq(resources.approved, true)];
+    if (filters?.category) conditions.push(eq(resources.category, filters.category));
+    if (filters?.search) conditions.push(sql`(${resources.title} ILIKE ${`%${filters.search}%`} OR ${resources.description} ILIKE ${`%${filters.search}%`})`);
+    return await db.select().from(resources).where(and(...conditions)).orderBy(desc(resources.saves));
+  }
+
+  async getResource(id: number): Promise<Resource | undefined> {
+    const [resource] = await db.select().from(resources).where(eq(resources.id, id));
+    return resource;
+  }
+
+  async createResource(data: InsertResource, addedById: string): Promise<Resource> {
+    const [newResource] = await db.insert(resources).values({ ...data, addedById, approved: false }).returning();
+    return newResource;
+  }
+
+  async approveResource(id: number): Promise<void> {
+    await db.update(resources).set({ approved: true }).where(eq(resources.id, id));
+  }
+
+  async toggleSaveResource(userId: string, resourceId: number): Promise<{ saved: boolean }> {
+    const existing = await db.select().from(savedResources)
+      .where(and(eq(savedResources.userId, userId), eq(savedResources.resourceId, resourceId)));
+    if (existing.length > 0) {
+      await db.delete(savedResources).where(and(eq(savedResources.userId, userId), eq(savedResources.resourceId, resourceId)));
+      await db.update(resources).set({ saves: sql`saves - 1` }).where(eq(resources.id, resourceId));
+      return { saved: false };
+    }
+    await db.insert(savedResources).values({ userId, resourceId });
+    await db.update(resources).set({ saves: sql`saves + 1` }).where(eq(resources.id, resourceId));
+    return { saved: true };
+  }
+
+  async getSavedResourceIds(userId: string): Promise<number[]> {
+    const saved = await db.select({ resourceId: savedResources.resourceId }).from(savedResources).where(eq(savedResources.userId, userId));
+    return saved.map(s => s.resourceId);
+  }
+
+  // === JOB LISTINGS ===
+  async listJobListings(filters?: { category?: string; state?: string; type?: string; isRemote?: boolean; search?: string }): Promise<JobListing[]> {
+    const conditions = [eq(jobListings.approved, true)];
+    if (filters?.category) conditions.push(eq(jobListings.category, filters.category));
+    if (filters?.state) conditions.push(eq(jobListings.state, filters.state));
+    if (filters?.type) conditions.push(eq(jobListings.type, filters.type));
+    if (filters?.isRemote !== undefined) conditions.push(eq(jobListings.isRemote, filters.isRemote));
+    if (filters?.search) conditions.push(sql`(${jobListings.title} ILIKE ${`%${filters.search}%`} OR ${jobListings.company} ILIKE ${`%${filters.search}%`})`);
+    return await db.select().from(jobListings).where(and(...conditions)).orderBy(desc(jobListings.createdAt));
+  }
+
+  async getJobListing(id: number): Promise<JobListing | undefined> {
+    const [job] = await db.select().from(jobListings).where(eq(jobListings.id, id));
+    return job;
+  }
+
+  async createJobListing(data: InsertJobListing, postedById: string): Promise<JobListing> {
+    const [newJob] = await db.insert(jobListings).values({ ...data, postedById, approved: false }).returning();
+    return newJob;
+  }
+
+  async approveJobListing(id: number): Promise<void> {
+    await db.update(jobListings).set({ approved: true }).where(eq(jobListings.id, id));
   }
 }
 

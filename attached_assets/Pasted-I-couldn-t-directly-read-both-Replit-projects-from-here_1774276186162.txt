@@ -1,0 +1,69 @@
+I couldn’t directly read both Replit projects from here: `MapAble-Unified` returned a public 404, and the Australian Disability Replit redirected to login. So I based the merge on the public Australian Disability site, the Replit org profile, and your MapAble ecosystem and product-blueprint materials. 
+
+## Combined abstract
+
+**Australian Disability Ltd and MapAble together form a mission-led digital ecosystem for disability inclusion in Australia.** Australian Disability provides the advocacy, media, community, education, and membership layer, with a public-facing platform focused on fairness, dignity, equality, original content, and community participation for people with disabilities. MapAble is the service-delivery engine within that broader mission: an accessibility-first, mobile-first super-app designed to help people with disability and their carers coordinate care, book accessible transport, and find inclusive jobs through a unified, trusted experience. ([Australian Disability Ltd][1])  
+
+**In one sentence:**
+Australian Disability is the umbrella brand and social-impact organisation; MapAble is its practical operating platform for daily independence. ([Australian Disability Ltd][1]) 
+
+## Cleaner integrated version
+
+Here’s a tighter abstract you could use on a deck, homepage, or grant application:
+
+> **Australian Disability Ltd is building an integrated digital ecosystem to improve independence, participation, and quality of life for people with disabilities across Australia. At the heart of this ecosystem is MapAble, an accessibility-first super-app that unifies care coordination, accessible transport, and inclusive employment into one seamless platform. Together, Australian Disability and MapAble combine advocacy, community media, and practical service delivery, creating a trusted bridge between disability rights, public engagement, and everyday supports. By merging mission-driven content, membership, and education with real-world tools for booking services and navigating life, the platform moves beyond awareness into measurable inclusion.** ([Australian Disability Ltd][1])  
+
+## Strategic framing
+
+This merged concept works best if positioned as a **two-layer model**:
+
+### 1. Australian Disability
+
+The **voice, trust, and community layer**:
+
+* advocacy and public education
+* disability media and storytelling
+* membership and supporter engagement
+* policy, resources, and community credibility ([Australian Disability Ltd][1])
+
+### 2. MapAble
+
+The **utility and transaction layer**:
+
+* care coordination
+* accessible transport booking
+* inclusive jobs
+* unified calendar, messaging, billing, and support
+* accessibility-first design and Australia-first integrations  
+
+## Best merged positioning line
+
+**Australian Disability informs, advocates, and builds community. MapAble turns that mission into action through tools people can use every day.** ([Australian Disability Ltd][1]) 
+
+## What this merge says to users
+
+For a visitor, the combined story becomes:
+
+* **Come for the mission and community**
+* **Stay for the tools that solve daily barriers**
+* **Trust the platform because it is built by a disability-led organisation, not just a generic marketplace** ([Australian Disability Ltd][1]) 
+
+## Recommended naming architecture
+
+A neat structure would be:
+
+**Australian Disability**
+*Parent brand / mission brand*
+
+**MapAble by Australian Disability**
+*Technology and services platform*
+
+That gives you moral authority at the top and product clarity underneath. It also matches your own docs, where MapAble is framed as an ecosystem within Australian Disability rather than a totally separate identity. 
+
+## Best single-paragraph website version
+
+**Australian Disability Ltd is a disability-led organisation creating a fairer, more inclusive Australia through advocacy, media, education, and technology. Its flagship platform, MapAble, transforms that mission into everyday impact by helping people with disability coordinate care, access accessible transport, and connect with inclusive work opportunities in one accessible digital ecosystem. Together, they unite community voice with practical support, delivering both representation and real-world independence.** ([Australian Disability Ltd][1])  
+
+A strong next move would be turning this into a homepage hero, a one-page executive summary, or a Replit app description.
+
+[1]: https://www.ausdis.au/ "Australian Disability Ltd | Fairness, Dignity and Equality for People with Disabilities "

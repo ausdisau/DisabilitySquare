@@ -133,6 +133,45 @@ Extensions are TypeScript modules in `server/extensions/` that export:
 ### Sample Extension
 See `server/extensions/samples/welcome-extension.ts` for a working example.
 
+## Competitive Features (vs Spoony & others)
+
+Five key features added to differentiate DisabilitySquare:
+
+### 1. Spoon Tracker (`/spoons`)
+- 12-spoon energy selector (spoon theory)
+- Optional daily note
+- 14-day bar chart history
+- 30-day average and streak stats
+
+### 2. Health Journal (`/journal`)
+- Daily mood tracking (1-5 scale with emoji)
+- Symptom selection (common + custom)
+- Pain level and energy level sliders
+- Private notes per day
+- History view of all past entries (private to user only)
+- Navigate back/forward through dates
+
+### 3. Service Provider Directory (`/providers`)
+- Browse 10+ seeded Australian disability service providers
+- Filter by category, state, NDIS registration
+- Search by name
+- Submit new providers for admin review
+- Full NDIS registration details displayed
+
+### 4. Resource Library (`/resources`)
+- Curated AU disability resources (NDIS, mental health, legal, employment, housing, etc.)
+- Bookmark/save resources for quick access
+- Filter by category or search
+- Submit resources for community review
+- Track how many people saved each resource
+
+### 5. Job Board (`/jobs`)
+- Disability-welcoming job listings
+- Filter by category, state, type, remote
+- Post jobs for admin review
+- Shows accessible workplace and disability-welcome badges
+- Click-through to apply online or via email
+
 ## Recent Changes
 
 - Integrated Auth0 authentication
@@ -150,3 +189,5 @@ See `server/extensions/samples/welcome-extension.ts` for a working example.
 - Extension management routes now require admin authorization
 - Hardened extension entry point validation with path resolution and symlink checks
 - ExtensionContext now uses storage methods for consistent valorization behavior
+- Added 5 competitive features: Spoon Tracker, Health Journal, Service Directory, Resource Library, Job Board
+- Seeded 10 service providers, 10 resources, 6 job listings (all approved)

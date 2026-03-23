@@ -21,6 +21,11 @@ import GameTetris from "@/pages/GameTetris";
 import Profile from "@/pages/Profile";
 import Recognition from "@/pages/Recognition";
 import Extensions from "@/pages/Extensions";
+import SpoonTracker from "@/pages/SpoonTracker";
+import Journal from "@/pages/Journal";
+import ServiceDirectory from "@/pages/ServiceDirectory";
+import Resources from "@/pages/Resources";
+import JobBoard from "@/pages/JobBoard";
 import NotFound from "@/pages/not-found";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
@@ -73,6 +78,11 @@ function Router() {
       <Route path="/recognition" component={props => <PrivateRoute component={Recognition} {...props} />} />
       <Route path="/extensions" component={props => <PrivateRoute component={Extensions} {...props} />} />
       <Route path="/profile" component={props => <PrivateRoute component={Profile} {...props} />} />
+      <Route path="/spoons" component={props => <PrivateRoute component={SpoonTracker} {...props} />} />
+      <Route path="/journal" component={props => <PrivateRoute component={Journal} {...props} />} />
+      <Route path="/providers" component={props => <PrivateRoute component={ServiceDirectory} {...props} />} />
+      <Route path="/resources" component={props => <PrivateRoute component={Resources} {...props} />} />
+      <Route path="/jobs" component={props => <PrivateRoute component={JobBoard} {...props} />} />
       <Route component={NotFound} />
     </Switch>
   );

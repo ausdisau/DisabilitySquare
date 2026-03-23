@@ -519,6 +519,218 @@ export async function registerRoutes(
     }
   });
 
+  // === SPOON STATUS ===
+  app.get('/api/spoons/today', isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    const today = new Date().toISOString().split('T')[0];
+    const status = await storage.getSpoonStatus(userId, today);
+    res.json(status || null);
+  });
+
+  app.post('/api/spoons', isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    try {
+      const schema = z.object({ spoons: z.number().int().min(1).max(12), note: z.string().optional(), date: z.string() });
+      const input = schema.parse(req.body);
+      const status = await storage.setSpoonStatus(userId, input);
+      res.json(status);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.get('/api/spoons/history', isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    const days = req.query.days ? Number(req.query.days) : 30;
+    const history = await storage.getSpoonHistory(userId, days);
+    res.json(history);
+  });
+
+  // === JOURNAL ===
+  app.get('/api/journal', isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    const limit = req.query.limit ? Number(req.query.limit) : 30;
+    const entries = await storage.listJournalEntries(userId, limit);
+    res.json(entries);
+  });
+
+  app.get('/api/journal/:date', isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    const entry = await storage.getJournalEntry(userId, req.params.date);
+    res.json(entry || null);
+  });
+
+  app.post('/api/journal', isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    try {
+      const schema = z.object({
+        date: z.string(),
+        mood: z.number().int().min(1).max(5),
+        symptoms: z.array(z.string()).optional().default([]),
+        painLevel: z.number().int().min(0).max(10).optional(),
+        energyLevel: z.number().int().min(1).max(10).optional(),
+        notes: z.string().optional(),
+        isPrivate: z.boolean().optional().default(true),
+      });
+      const input = schema.parse(req.body);
+      const entry = await storage.upsertJournalEntry(userId, input as any);
+      res.json(entry);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // === SERVICE PROVIDERS ===
+  app.get('/api/providers', async (req, res) => {
+    const filters = {
+      category: req.query.category as string | undefined,
+      state: req.query.state as string | undefined,
+      ndisRegistered: req.query.ndisRegistered === 'true' ? true : req.query.ndisRegistered === 'false' ? false : undefined,
+      search: req.query.search as string | undefined,
+    };
+    const providers = await storage.listServiceProviders(filters);
+    res.json(providers);
+  });
+
+  app.get('/api/providers/:id', async (req, res) => {
+    const provider = await storage.getServiceProvider(Number(req.params.id));
+    if (!provider) return res.status(404).json({ message: 'Provider not found' });
+    res.json(provider);
+  });
+
+  app.post('/api/providers', isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    try {
+      const schema = z.object({
+        name: z.string().min(2),
+        category: z.enum(['allied_health', 'support_worker', 'accommodation', 'employment', 'legal', 'mental_health', 'equipment', 'other']),
+        description: z.string().min(10),
+        location: z.string().min(2),
+        state: z.string().min(2),
+        phone: z.string().optional(),
+        email: z.string().email().optional(),
+        website: z.string().url().optional(),
+        ndisRegistered: z.boolean().optional().default(false),
+        acceptsNdis: z.boolean().optional().default(false),
+        disabilityTypes: z.array(z.string()).optional().default([]),
+      });
+      const input = schema.parse(req.body);
+      const provider = await storage.createServiceProvider(input as any, userId);
+      res.status(201).json(provider);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/providers/:id/approve', isAuthenticated, isAdmin, async (req: any, res) => {
+    await storage.approveServiceProvider(Number(req.params.id));
+    res.json({ success: true });
+  });
+
+  // === RESOURCES ===
+  app.get('/api/resources', async (req, res) => {
+    const filters = {
+      category: req.query.category as string | undefined,
+      search: req.query.search as string | undefined,
+    };
+    const resourcesList = await storage.listResources(filters);
+    res.json(resourcesList);
+  });
+
+  app.get('/api/resources/saved', isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    const savedIds = await storage.getSavedResourceIds(userId);
+    res.json(savedIds);
+  });
+
+  app.post('/api/resources/:id/save', isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    const result = await storage.toggleSaveResource(userId, Number(req.params.id));
+    res.json(result);
+  });
+
+  app.post('/api/resources', isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    try {
+      const schema = z.object({
+        title: z.string().min(2),
+        description: z.string().min(10),
+        url: z.string().url(),
+        category: z.enum(['ndis', 'mental_health', 'employment', 'legal', 'housing', 'community', 'research', 'tools']),
+        tags: z.array(z.string()).optional().default([]),
+        source: z.string().min(2),
+        isAustralian: z.boolean().optional().default(true),
+      });
+      const input = schema.parse(req.body);
+      const resource = await storage.createResource(input as any, userId);
+      res.status(201).json(resource);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/resources/:id/approve', isAuthenticated, isAdmin, async (req: any, res) => {
+    await storage.approveResource(Number(req.params.id));
+    res.json({ success: true });
+  });
+
+  // === JOB LISTINGS ===
+  app.get('/api/jobs', async (req, res) => {
+    const filters = {
+      category: req.query.category as string | undefined,
+      state: req.query.state as string | undefined,
+      type: req.query.type as string | undefined,
+      isRemote: req.query.isRemote === 'true' ? true : req.query.isRemote === 'false' ? false : undefined,
+      search: req.query.search as string | undefined,
+    };
+    const jobs = await storage.listJobListings(filters);
+    res.json(jobs);
+  });
+
+  app.get('/api/jobs/:id', async (req, res) => {
+    const job = await storage.getJobListing(Number(req.params.id));
+    if (!job) return res.status(404).json({ message: 'Job not found' });
+    res.json(job);
+  });
+
+  app.post('/api/jobs', isAuthenticated, async (req: any, res) => {
+    const userId = req.userId || req.oidc?.user?.sub;
+    try {
+      const schema = z.object({
+        title: z.string().min(2),
+        company: z.string().min(2),
+        description: z.string().min(10),
+        location: z.string().min(2),
+        state: z.string().min(2),
+        type: z.enum(['full_time', 'part_time', 'casual', 'volunteer', 'contract']),
+        salary: z.string().optional(),
+        category: z.enum(['admin', 'healthcare', 'tech', 'creative', 'education', 'retail', 'trades', 'other']),
+        tags: z.array(z.string()).optional().default([]),
+        isRemote: z.boolean().optional().default(false),
+        isAccessible: z.boolean().optional().default(false),
+        disabilityWelcome: z.boolean().optional().default(false),
+        applyUrl: z.string().url().optional(),
+        applyEmail: z.string().email().optional(),
+        expiresAt: z.string().optional().transform(v => v ? new Date(v) : undefined),
+      });
+      const input = schema.parse(req.body);
+      const job = await storage.createJobListing(input as any, userId);
+      res.status(201).json(job);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/jobs/:id/approve', isAuthenticated, isAdmin, async (req: any, res) => {
+    await storage.approveJobListing(Number(req.params.id));
+    res.json({ success: true });
+  });
+
   // === VOICE TRANSCRIPTION (Accessibility Feature) ===
   const MAX_AUDIO_SIZE = 10 * 1024 * 1024; // 10MB limit
   
