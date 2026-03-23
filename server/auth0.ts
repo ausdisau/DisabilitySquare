@@ -78,6 +78,11 @@ export const isAuthenticated = async (req: Request, res: Response, next: NextFun
         if (isFirstUser) {
           console.log(`[Auth] First user ${auth0User.sub} registered as admin`);
         }
+      } else if (existingUser.isActive === false) {
+        return res.status(403).json({
+          message: existingUser.deactivationNotice ?? "Your account has been deactivated following an eSafety compliance review. If you believe this is an error, please contact our support team to appeal.",
+          code: "ACCOUNT_DEACTIVATED",
+        });
       }
       
       // Attach user ID to request for easy access
@@ -134,18 +139,28 @@ export const requiresAgeVerification = async (req: Request, res: Response, next:
 // Register Auth0 specific routes
 export function registerAuth0Routes(app: Express) {
   // Get current user info
-  app.get("/api/auth/user", (req, res) => {
+  app.get("/api/auth/user", async (req, res) => {
     if (!req.oidc?.isAuthenticated()) {
       return res.status(401).json({ message: "Unauthorized" });
     }
     
+    let isAdmin = false;
+    const userId = req.oidc.user?.sub;
+    if (userId) {
+      try {
+        const [dbUser] = await db.select({ isAdmin: users.isAdmin }).from(users).where(eq(users.id, userId));
+        isAdmin = dbUser?.isAdmin ?? false;
+      } catch {}
+    }
+    
     res.json({
-      id: req.oidc.user?.sub,
+      id: userId,
       email: req.oidc.user?.email,
       name: req.oidc.user?.name,
       firstName: req.oidc.user?.given_name,
       lastName: req.oidc.user?.family_name,
       picture: req.oidc.user?.picture,
+      isAdmin,
     });
   });
   

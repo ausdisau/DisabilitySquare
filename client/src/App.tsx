@@ -35,6 +35,7 @@ import NotFound from "@/pages/not-found";
 import SafetyCentre from "@/pages/SafetyCentre";
 import TermsOfService from "@/pages/TermsOfService";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import AdminReports from "@/pages/AdminReports";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -74,6 +75,23 @@ function PrivateRoute({ component: Component, ...rest }: any) {
   return <Component {...rest} />;
 }
 
+function AdminRoute({ component: Component, ...rest }: any) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) return <Landing />;
+  if (!user.isAdmin) return <div className="min-h-screen flex items-center justify-center"><p className="text-muted-foreground">Access denied. Admin privileges required.</p></div>;
+
+  return <Component {...rest} />;
+}
+
 function Router() {
   return (
     <Switch>
@@ -100,6 +118,7 @@ function Router() {
       <Route path="/safety" component={SafetyCentre} />
       <Route path="/terms" component={TermsOfService} />
       <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/admin/reports" component={props => <AdminRoute component={AdminReports} {...props} />} />
       <Route component={NotFound} />
     </Switch>
   );

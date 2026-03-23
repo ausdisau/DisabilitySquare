@@ -83,7 +83,14 @@ export interface IStorage {
   getUserReports(userId: string): Promise<UserReport[]>;
   hasReportedUser(reporterId: string, reportedUserId: string, reportType: string): Promise<boolean>;
   listAllReports(status?: string): Promise<UserReport[]>;
-  updateReportStatus(id: number, status: string, reviewedBy: string, adminNotes?: string): Promise<UserReport | undefined>;
+  getAdminReports(scheme?: string, status?: string): Promise<(UserReport & { reporter: User; reportedUser: User })[]>;
+  getReportById(id: number): Promise<UserReport | undefined>;
+  updateReportStatus(id: number, adminId: string, data: { status?: string; adminNotes?: string }): Promise<UserReport>;
+  deactivateUser(userId: string, notice?: string): Promise<void>;
+
+  // Public stats (for landing page)
+  getPublicStats(): Promise<{ memberCount: number; threadCount: number; replyCount: number }>;
+  getPublicRecentActivity(limit?: number): Promise<{ id: number; title: string; categorySlug: string; createdAt: Date | null }[]>;
 
   // Spoon Status
   setSpoonStatus(userId: string, data: InsertSpoonStatus): Promise<SpoonStatus>;
@@ -141,10 +148,6 @@ export interface IStorage {
   toggleForumVote(userId: string, entityType: string, entityId: number): Promise<{ voted: boolean; count: number; recipientId?: string }>;
   getUserForumVotes(userId: string, entityType: string, entityIds: number[]): Promise<number[]>;
   markAcceptedAnswer(threadId: number, replyId: number, requestingUserId: string): Promise<{ replyAuthorId: string; wasAlreadyAccepted: boolean }>;
-
-  // Public stats (unauthenticated)
-  getPublicStats(): Promise<{ memberCount: number; threadCount: number; replyCount: number }>;
-  getPublicRecentActivity(limit?: number): Promise<{ id: number; title: string; categorySlug: string; createdAt: Date | null }[]>;
 
   // Venues
   listVenues(): Promise<Venue[]>;
@@ -453,6 +456,53 @@ export class DatabaseStorage implements IStorage {
       )
     );
     return existing.length > 0;
+  }
+
+  async getAdminReports(scheme?: string, status?: string): Promise<(UserReport & { reporter: User; reportedUser: User })[]> {
+    const conditions = [];
+    if (scheme) conditions.push(eq(userReports.esafetyScheme, scheme));
+    if (status) conditions.push(eq(userReports.status, status));
+    const reports = await db.query.userReports.findMany({
+      where: conditions.length > 0 ? and(...conditions) : undefined,
+      orderBy: [desc(userReports.createdAt)],
+      with: {
+        reporter: true,
+        reportedUser: true,
+      },
+    });
+    return reports as any;
+  }
+
+  async listAllReports(status?: string): Promise<UserReport[]> {
+    if (status) {
+      return await db.select().from(userReports).where(eq(userReports.status, status)).orderBy(desc(userReports.createdAt));
+    }
+    return await db.select().from(userReports).orderBy(desc(userReports.createdAt));
+  }
+
+  async getReportById(id: number): Promise<UserReport | undefined> {
+    const [report] = await db.select().from(userReports).where(eq(userReports.id, id));
+    return report;
+  }
+
+  async updateReportStatus(id: number, adminId: string, data: { status?: string; adminNotes?: string }): Promise<UserReport> {
+    const [updated] = await db.update(userReports)
+      .set({
+        ...(data.status ? { status: data.status } : {}),
+        ...(data.adminNotes !== undefined ? { adminNotes: data.adminNotes } : {}),
+        reviewedAt: new Date(),
+        reviewedBy: adminId,
+      })
+      .where(eq(userReports.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deactivateUser(userId: string, notice?: string): Promise<void> {
+    await db.update(users).set({
+      isActive: false,
+      deactivationNotice: notice ?? 'Your account has been deactivated following an eSafety compliance review. If you believe this is an error, please contact our support team to appeal this decision.',
+    }).where(eq(users.id, userId));
   }
 
   // === SPOON STATUS ===
@@ -857,21 +907,6 @@ export class DatabaseStorage implements IStorage {
       with: { profile: true },
       limit: 100,
     }) as any;
-  }
-
-  async listAllReports(status?: string): Promise<UserReport[]> {
-    if (status) {
-      return await db.select().from(userReports).where(eq(userReports.status, status)).orderBy(desc(userReports.createdAt));
-    }
-    return await db.select().from(userReports).orderBy(desc(userReports.createdAt));
-  }
-
-  async updateReportStatus(id: number, status: string, reviewedBy: string, adminNotes?: string): Promise<UserReport | undefined> {
-    const [updated] = await db.update(userReports)
-      .set({ status, reviewedBy, adminNotes, reviewedAt: new Date() })
-      .where(eq(userReports.id, id))
-      .returning();
-    return updated;
   }
 
   async getPublicMemberCount(): Promise<number> {
@@ -1618,6 +1653,7 @@ export class DatabaseStorage implements IStorage {
 
     return { event, venue, serviceProviders: matchedServices, transportProviders, accessibilityWarnings };
   }
+
 }
 
 export const storage = new DatabaseStorage();

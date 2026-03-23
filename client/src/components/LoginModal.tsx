@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Users, Shield, Heart, LogIn, Calendar, AlertTriangle, 
   XCircle, CheckCircle2, Loader2, ArrowLeft
@@ -32,6 +33,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
   const [day, setDay] = useState("");
   const [month, setMonth] = useState("");
   const [year, setYear] = useState("");
+  const [declarationAccepted, setDeclarationAccepted] = useState(false);
 
   // Check if user already passed the gates
   useEffect(() => {
@@ -98,6 +100,11 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
 
     if (!isValidDate(d, m, y)) {
       setError("This date doesn't exist. Please check your entry.");
+      return;
+    }
+
+    if (!declarationAccepted) {
+      setError("Please confirm the age declaration to continue");
       return;
     }
 
@@ -242,6 +249,20 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                 </div>
               </div>
 
+              <div className="flex items-start gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                <Checkbox
+                  id="login-age-declaration"
+                  checked={declarationAccepted}
+                  onCheckedChange={(checked) => setDeclarationAccepted(checked === true)}
+                  className="mt-0.5"
+                  data-testid="checkbox-login-age-declaration"
+                />
+                <Label htmlFor="login-age-declaration" className="text-xs leading-snug cursor-pointer font-normal">
+                  I confirm I am 16 years or older. I understand that accounts belonging to under-16 users will be deactivated and data handled per the{" "}
+                  <a href="/privacy" className="underline text-primary">Privacy Policy</a>.
+                </Label>
+              </div>
+
               {error && (
                 <div className="flex items-center gap-2 text-destructive text-sm p-3 bg-destructive/10 rounded-md">
                   <AlertTriangle className="h-4 w-4 flex-shrink-0" />
@@ -253,6 +274,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                 className="w-full" 
                 size="lg"
                 onClick={handleAgeVerify}
+                disabled={!declarationAccepted}
                 data-testid="button-verify-age"
               >
                 <CheckCircle2 className="mr-2 h-5 w-5" />

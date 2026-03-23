@@ -75,7 +75,7 @@ app.use((req, res, next) => {
     log(`Transport seed failed: ${err}`, "transport");
   }
 
-  // Seed forum categories on startup
+  // Seed forum categories on startup (idempotent)
   try {
     const { storage } = await import("./storage");
     await storage.seedForumCategories();

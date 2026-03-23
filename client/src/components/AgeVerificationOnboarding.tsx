@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ShieldCheck, AlertTriangle, Loader2, XCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -19,6 +20,7 @@ export function AgeVerificationOnboarding({ onVerified }: AgeVerificationOnboard
   const [year, setYear] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [underage, setUnderage] = useState(false);
+  const [declarationAccepted, setDeclarationAccepted] = useState(false);
   const queryClient = useQueryClient();
 
   const currentYear = new Date().getFullYear();
@@ -49,15 +51,15 @@ export function AgeVerificationOnboarding({ onVerified }: AgeVerificationOnboard
   };
 
   const verifyMutation = useMutation({
-    mutationFn: async (dateOfBirth: string) => {
-      const res = await apiRequest("POST", "/api/verify-age", { dateOfBirth });
-      return res.json() as Promise<{ success: boolean; message?: string }>;
+    mutationFn: async (payload: { dateOfBirth: string; ageDeclarationAccepted: boolean }) => {
+      const res = await apiRequest("POST", "/api/verify-age", payload);
+      const data = await res.json() as { success: boolean; message?: string; isUnder18?: boolean };
+      if (!res.ok) throw new Error(data.message || "Verification failed");
+      return data;
     },
-    onSuccess: (data) => {
-      if (data.success) {
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/status"] });
-        onVerified();
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/status"] });
+      onVerified();
     },
     onError: (error: any) => {
       if (error.message?.includes("16 years old") || error.message?.includes("403")) {
@@ -74,6 +76,11 @@ export function AgeVerificationOnboarding({ onVerified }: AgeVerificationOnboard
 
     if (!day || !month || !year) {
       setError("Please enter your complete date of birth");
+      return;
+    }
+
+    if (!declarationAccepted) {
+      setError("You must confirm the age declaration to continue");
       return;
     }
 
@@ -110,7 +117,7 @@ export function AgeVerificationOnboarding({ onVerified }: AgeVerificationOnboard
       return;
     }
 
-    verifyMutation.mutate(birthDate.toISOString());
+    verifyMutation.mutate({ dateOfBirth: birthDate.toISOString(), ageDeclarationAccepted: declarationAccepted });
   };
 
   if (underage) {
@@ -205,6 +212,20 @@ export function AgeVerificationOnboarding({ onVerified }: AgeVerificationOnboard
               </div>
             </div>
 
+            <div className="flex items-start gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+              <Checkbox
+                id="age-declaration"
+                checked={declarationAccepted}
+                onCheckedChange={(checked) => setDeclarationAccepted(checked === true)}
+                className="mt-0.5"
+                data-testid="checkbox-age-declaration"
+              />
+              <Label htmlFor="age-declaration" className="text-sm leading-snug cursor-pointer font-normal">
+                I confirm I am 16 years or older. I understand that accounts belonging to under-16 users will be deactivated and data handled per the{" "}
+                <a href="/privacy" className="underline text-primary">Privacy Policy</a>.
+              </Label>
+            </div>
+
             {error && (
               <div className="flex items-center gap-2 text-destructive text-sm">
                 <AlertTriangle className="h-4 w-4" />
@@ -216,7 +237,7 @@ export function AgeVerificationOnboarding({ onVerified }: AgeVerificationOnboard
               type="submit" 
               className="w-full" 
               size="lg" 
-              disabled={verifyMutation.isPending}
+              disabled={verifyMutation.isPending || !declarationAccepted}
               data-testid="button-verify-age-onboarding"
             >
               {verifyMutation.isPending ? (

@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Star, Award, Trophy, Users, GraduationCap, Megaphone, HandHeart, UserPlus, Heart, MessageSquare } from "lucide-react";
+import { Loader2, Save, Star, Award, Trophy, Users, GraduationCap, Megaphone, HandHeart, UserPlus, Heart, MessageSquare, ShieldCheck } from "lucide-react";
 
 const iconMap: Record<string, any> = {
   Trophy,
@@ -50,7 +50,7 @@ export default function Profile() {
 
   useEffect(() => {
     if (profile) {
-      const prompts = (profile as any).healthPrompts || {};
+      const prompts = profile.healthPrompts || {};
       form.reset({
         bio: profile.bio || "",
         location: profile.location || "",
@@ -97,7 +97,24 @@ export default function Profile() {
             </AvatarFallback>
           </Avatar>
           <div>
-            <h2 className="text-2xl font-bold">{user?.firstName} {user?.lastName}</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-2xl font-bold">{user?.firstName} {user?.lastName}</h2>
+              {profile?.visibility === "members_only" && profile?.dmRestricted && (
+                <Badge
+                  variant="secondary"
+                  className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+                  data-testid="badge-protected-account"
+                >
+                  <ShieldCheck className="h-3 w-3" />
+                  Protected Account
+                </Badge>
+              )}
+            </div>
+            {profile?.visibility === "members_only" && profile?.dmRestricted && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1" data-testid="text-protected-account-description">
+                This account has enhanced privacy protections. Profile is visible to members only and direct messages are restricted to accepted connections.
+              </p>
+            )}
             <p className="text-muted-foreground">{user?.email}</p>
           </div>
         </div>

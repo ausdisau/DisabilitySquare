@@ -21,6 +21,10 @@ export const profiles = pgTable("profiles", {
   dateOfBirth: timestamp("date_of_birth"),
   ageVerified: boolean("age_verified").default(false),
   ageVerifiedAt: timestamp("age_verified_at"),
+  ageDeclarationAt: timestamp("age_declaration_at"),
+  // Under-18 privacy protections (eSafety SMMA compliance)
+  visibility: text("visibility").default("public"), // 'public' | 'members_only'
+  dmRestricted: boolean("dm_restricted").default(false),
   // Health story prompts (inspired by The Mighty's community engagement model)
   healthPrompts: jsonb("health_prompts").$type<{
     wishPeopleKnew?: string;
@@ -532,19 +536,23 @@ export const userReports = pgTable("user_reports", {
   id: serial("id").primaryKey(),
   reporterId: varchar("reporter_id").notNull().references(() => users.id),
   reportedUserId: varchar("reported_user_id").notNull().references(() => users.id),
-  reportType: varchar("report_type", { length: 50 }).notNull(), // 'underage', 'harassment', 'inappropriate_content', etc.
+  reportType: varchar("report_type", { length: 50 }).notNull(), // eSafety scheme or legacy type
+  esafetyScheme: varchar("esafety_scheme", { length: 50 }), // 'cyberbullying' | 'adult_cyber_abuse' | 'image_based_abuse' | 'illegal_content' | 'general_harassment' | 'underage'
+  // Task #3 eSafety extension fields
+  urgencyLevel: varchar("urgency_level", { length: 20 }), // 'low' | 'medium' | 'high' | 'critical'
+  reportReference: text("report_reference"), // External reference number (e.g. eSafety case ID)
+  targetContentType: varchar("target_content_type", { length: 50 }), // 'post' | 'comment' | 'forum_thread' | 'forum_reply' | 'profile'
+  targetContentId: integer("target_content_id"), // ID of the reported content item (Task #3 naming)
+  // Task #5 content fields
+  contentType: varchar("content_type", { length: 20 }), // 'post' | 'thread' | 'reply' | 'user'
+  contentId: integer("content_id"), // ID of the reported content item (Task #5 naming)
   reason: text("reason"),
+  contextData: jsonb("context_data").$type<Record<string, string>>().default({}),
   status: varchar("status", { length: 20 }).default("pending").notNull(), // 'pending', 'reviewed', 'dismissed', 'actioned'
   createdAt: timestamp("created_at").defaultNow().notNull(),
   reviewedAt: timestamp("reviewed_at"),
   reviewedBy: varchar("reviewed_by").references(() => users.id),
   adminNotes: text("admin_notes"),
-  // eSafety scheme extension
-  esafetyScheme: varchar("esafety_scheme", { length: 50 }), // 'basic_online_safety', 'online_safety_code', 'online_safety_act'
-  urgencyLevel: varchar("urgency_level", { length: 20 }), // 'low', 'medium', 'high', 'critical'
-  reportReference: text("report_reference"), // External reference number (e.g. eSafety case ID)
-  targetContentType: varchar("target_content_type", { length: 50 }), // 'post', 'comment', 'forum_thread', 'forum_reply', 'profile'
-  targetContentId: integer("target_content_id"), // ID of the reported content item
 }, (table) => ({
   uniqueReport: unique("unique_report_per_user_type").on(table.reporterId, table.reportedUserId, table.reportType),
 }));

@@ -11,8 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import { ArrowUp, CheckCircle, ChevronLeft, Lightbulb, MessageSquare } from "lucide-react";
+import { ArrowUp, CheckCircle, ChevronLeft, Flag, Lightbulb, MessageSquare } from "lucide-react";
 import type { ForumThread, ForumReply, ForumCategory } from "@shared/schema";
+import { ReportDialog } from "@/components/ReportDialog";
 
 type ReplyWithAuthor = ForumReply & {
   author: { id?: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null };
@@ -41,6 +42,7 @@ function ReplyCard({
   isThreadAuthor,
   isAdviceRequest,
   userVotedReplyIds,
+  currentUserId,
   onVote,
   onAccept,
 }: {
@@ -49,11 +51,14 @@ function ReplyCard({
   isThreadAuthor: boolean;
   isAdviceRequest: boolean;
   userVotedReplyIds: number[];
+  currentUserId?: string;
   onVote: (replyId: number) => void;
   onAccept: (replyId: number) => void;
 }) {
+  const [reportOpen, setReportOpen] = useState(false);
   const voted = userVotedReplyIds.includes(reply.id);
   const authorName = `${reply.author.firstName || "Member"} ${reply.author.lastName || ""}`.trim();
+  const canReport = !!currentUserId && !!reply.author.id;
 
   return (
     <article
@@ -112,10 +117,31 @@ function ReplyCard({
                   Mark as Answer
                 </button>
               )}
+              {canReport && (
+                <button
+                  onClick={() => setReportOpen(true)}
+                  data-testid={`button-report-reply-${reply.id}`}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive px-2 py-1 rounded-full hover:bg-destructive/10 transition-colors ml-auto"
+                  aria-label="Report reply"
+                >
+                  <Flag className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {canReport && reply.author.id && (
+        <ReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          contentType="reply"
+          contentId={reply.id}
+          authorId={reply.author.id}
+          authorName={authorName}
+        />
+      )}
     </article>
   );
 }
@@ -194,6 +220,8 @@ export default function ForumThreadPage() {
 
   const isThreadAuthor = !!user && thread?.authorId === user.id;
   const authorName = thread ? `${thread.author.firstName || "Member"} ${thread.author.lastName || ""}`.trim() : "";
+  const [threadReportOpen, setThreadReportOpen] = useState(false);
+  const canReportThread = !!user && thread && !!thread.author.id;
 
   const acceptedReplies = thread?.replies.filter(r => r.isAcceptedAnswer) || [];
   const otherReplies = thread?.replies.filter(r => !r.isAcceptedAnswer) || [];
@@ -299,11 +327,33 @@ export default function ForumThreadPage() {
                         <MessageSquare className="h-3.5 w-3.5" />
                         {thread.replyCount} repl{thread.replyCount !== 1 ? "ies" : "y"}
                       </span>
+                      {canReportThread && (
+                        <button
+                          onClick={() => setThreadReportOpen(true)}
+                          data-testid={`button-report-thread-${thread.id}`}
+                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive px-2 py-1 rounded-full hover:bg-destructive/10 transition-colors ml-auto"
+                          aria-label="Report thread"
+                        >
+                          <Flag className="h-3.5 w-3.5" />
+                          Report
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
             </article>
+
+            {canReportThread && thread.author.id && (
+              <ReportDialog
+                open={threadReportOpen}
+                onOpenChange={setThreadReportOpen}
+                contentType="thread"
+                contentId={thread.id}
+                authorId={thread.author.id}
+                authorName={authorName}
+              />
+            )}
 
             {/* Accepted answers pinned first */}
             {acceptedReplies.map(reply => (
@@ -314,6 +364,7 @@ export default function ForumThreadPage() {
                 isThreadAuthor={isThreadAuthor}
                 isAdviceRequest={thread.isAdviceRequest}
                 userVotedReplyIds={userVotedReplyIds}
+                currentUserId={user?.id}
                 onVote={id => voteMutation.mutate({ entityType: "reply", entityId: id })}
                 onAccept={id => acceptMutation.mutate(id)}
               />
@@ -336,6 +387,7 @@ export default function ForumThreadPage() {
                 isThreadAuthor={isThreadAuthor}
                 isAdviceRequest={thread.isAdviceRequest}
                 userVotedReplyIds={userVotedReplyIds}
+                currentUserId={user?.id}
                 onVote={id => voteMutation.mutate({ entityType: "reply", entityId: id })}
                 onAccept={id => acceptMutation.mutate(id)}
               />

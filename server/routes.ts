@@ -4,8 +4,23 @@ import { storage } from "./storage";
 import { setupAuth0, registerAuth0Routes, isAuthenticated } from "./auth0";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { POINT_VALUES, EXTENSION_EVENTS, EXTENSION_PERMISSIONS } from "@shared/schema";
+import { POINT_VALUES, EXTENSION_EVENTS, EXTENSION_PERMISSIONS, profiles } from "@shared/schema";
 import { extensionManager } from "./extensions";
+import { db } from "./db";
+import { inArray, eq } from "drizzle-orm";
+
+async function getMembersOnlyUserIds(userIds: string[]): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
+  const rows = await db
+    .select({ userId: profiles.userId, visibility: profiles.visibility })
+    .from(profiles)
+    .where(inArray(profiles.userId, userIds));
+  return new Set(rows.filter(r => r.visibility === 'members_only').map(r => r.userId));
+}
+
+function anonymizeAuthor(author: any): any {
+  return { ...author, firstName: "Protected", lastName: "Member", email: null, profileImageUrl: null };
+}
 
 // Middleware to check if user is admin (persisted in database)
 const isAdmin = async (req: any, res: Response, next: NextFunction) => {
@@ -32,9 +47,16 @@ export async function registerRoutes(
   registerAuth0Routes(app);
 
   // === PROFILES ===
-  app.get(api.profiles.get.path, async (req, res) => {
+  app.get(api.profiles.get.path, async (req: any, res) => {
     const profile = await storage.getProfile(req.params.userId);
     if (!profile) return res.status(404).json({ message: "Profile not found" });
+    // eSafety: members_only visibility — only authenticated users may view this profile
+    if (profile.visibility === 'members_only') {
+      const requesterId = req.userId || req.oidc?.user?.sub;
+      if (!requesterId) {
+        return res.status(403).json({ message: "This profile is only visible to members." });
+      }
+    }
     res.json(profile);
   });
 
@@ -53,6 +75,34 @@ export async function registerRoutes(
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
       }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // === DIRECT MESSAGES ===
+
+  // POST /api/direct-messages/start — initiate DM with a user (enforces dmRestricted for under-18 accounts)
+  app.post("/api/direct-messages/start", isAuthenticated, async (req: any, res) => {
+    const requesterId = req.userId || req.oidc?.user?.sub;
+    try {
+      const schema = z.object({ targetUserId: z.string().min(1) });
+      const { targetUserId } = schema.parse(req.body);
+      if (targetUserId === requesterId) {
+        return res.status(400).json({ message: "You cannot message yourself" });
+      }
+      const targetProfile = await storage.getProfile(targetUserId);
+      if (!targetProfile) return res.status(404).json({ message: "User not found" });
+      // eSafety: dmRestricted accounts only accept messages from established connections
+      // An established connection means the restricted user already follows the requester
+      if (targetProfile.dmRestricted) {
+        const connected = await storage.isFollowing(targetUserId, requesterId);
+        if (!connected) {
+          return res.status(403).json({ message: "This user has restricted direct messages. Only their accepted connections may message them." });
+        }
+      }
+      res.json({ success: true, targetUserId });
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -101,11 +151,22 @@ export async function registerRoutes(
   });
 
   // === POSTS ===
-  app.get(api.posts.list.path, async (req, res) => {
+  app.get(api.posts.list.path, async (req: any, res) => {
     const groupId = req.query.groupId ? Number(req.query.groupId) : undefined;
     const tag = req.query.tag as string | undefined;
-    const posts = await storage.listPosts(groupId, tag);
-    res.json(posts);
+    const postsList = await storage.listPosts(groupId, tag);
+    // eSafety: anonymize members_only (16–17 yo) authors for unauthenticated requests
+    const requesterId = req.userId || req.oidc?.user?.sub;
+    if (!requesterId) {
+      const authorIds = [...new Set(postsList.map((p: any) => p.author?.id).filter(Boolean))];
+      const protectedIds = await getMembersOnlyUserIds(authorIds);
+      if (protectedIds.size > 0) {
+        return res.json(postsList.map((p: any) =>
+          protectedIds.has(p.author?.id) ? { ...p, author: anonymizeAuthor(p.author) } : p
+        ));
+      }
+    }
+    res.json(postsList);
   });
 
   app.post(api.posts.create.path, isAuthenticated, async (req: any, res) => {
@@ -199,9 +260,15 @@ export async function registerRoutes(
   });
 
   // GET /api/connect/members — list all members (for browse view)
-  app.get('/api/connect/members', async (req, res) => {
+  app.get('/api/connect/members', async (req: any, res) => {
     const members = await storage.listAllProfiles();
-    res.json(members);
+    // eSafety: exclude members_only profiles from public/unauthenticated requests
+    const requesterId = req.userId || req.oidc?.user?.sub;
+    if (!requesterId) {
+      res.json(members.filter(m => m.profile?.visibility !== 'members_only'));
+    } else {
+      res.json(members);
+    }
   });
 
   // === PUBLIC COMMUNITY STATS (no auth required) ===
@@ -373,15 +440,19 @@ export async function registerRoutes(
 
   // === USER REPORTS (eSafety compliance) ===
   
-  // Report a user (e.g., for being underage)
+  // Submit a content or user report (eSafety multi-scheme)
   app.post("/api/reports", isAuthenticated, async (req: any, res) => {
     const reporterId = req.userId || req.oidc?.user?.sub;
     
     try {
       const schema = z.object({
         reportedUserId: z.string().min(1),
-        reportType: z.enum(['underage', 'harassment', 'inappropriate_content', 'spam', 'other']),
+        reportType: z.string().min(1), // eSafety scheme key or legacy type
+        esafetyScheme: z.string().optional(),
+        contentType: z.enum(['post', 'thread', 'reply', 'user']).optional(),
+        contentId: z.number().int().optional(),
         reason: z.string().optional(),
+        contextData: z.record(z.string()).optional(),
       });
       
       const input = schema.parse(req.body);
@@ -390,23 +461,22 @@ export async function registerRoutes(
       if (input.reportedUserId === reporterId) {
         return res.status(400).json({ message: "You cannot report yourself" });
       }
-      
-      // Check if user has already reported this person for this reason
-      const alreadyReported = await storage.hasReportedUser(
-        reporterId, 
-        input.reportedUserId, 
-        input.reportType
-      );
-      
+
+      // Prevent duplicate reports
+      const alreadyReported = await storage.hasReportedUser(reporterId, input.reportedUserId, input.reportType);
       if (alreadyReported) {
-        return res.status(400).json({ message: "You have already submitted this report" });
+        return res.status(409).json({ message: "You have already submitted a report of this type for this user" });
       }
       
       const report = await storage.createUserReport({
         reporterId,
         reportedUserId: input.reportedUserId,
         reportType: input.reportType,
+        esafetyScheme: input.esafetyScheme || input.reportType,
+        contentType: input.contentType || 'user',
+        contentId: input.contentId,
         reason: input.reason,
+        contextData: input.contextData || {},
         status: 'pending',
       });
       
@@ -428,7 +498,7 @@ export async function registerRoutes(
     res.json({ hasReported });
   });
 
-  // Create an eSafety scheme-typed report (extended)
+  // POST /api/reports/esafety — extended eSafety report endpoint with duplicate check
   app.post("/api/reports/esafety", isAuthenticated, async (req: any, res) => {
     const reporterId = req.userId || req.oidc?.user?.sub;
     try {
@@ -446,7 +516,6 @@ export async function registerRoutes(
       if (input.reportedUserId === reporterId) {
         return res.status(400).json({ message: "You cannot report yourself" });
       }
-      // Check for duplicate: same reporter, reported user, and report type
       const alreadyReported = await storage.hasReportedUser(reporterId, input.reportedUserId, input.reportType);
       if (alreadyReported) {
         return res.status(400).json({ message: "You have already submitted a report of this type against this user" });
@@ -466,7 +535,6 @@ export async function registerRoutes(
       res.status(201).json({ success: true, reportId: report.id });
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
-      // Handle unique constraint violation (duplicate report) as a safety net
       if ((error as any)?.code === '23505') {
         return res.status(400).json({ message: "You have already submitted a report of this type against this user" });
       }
@@ -474,20 +542,23 @@ export async function registerRoutes(
     }
   });
 
-  // List all reports (admin only)
+  // === ADMIN REPORTS (underage + eSafety reports) ===
+
+  // GET /api/admin/reports — list all reports, optionally filtered by scheme and/or status
   app.get("/api/admin/reports", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
+      const scheme = req.query.scheme as string | undefined;
       const validStatuses = ['pending', 'reviewed', 'dismissed', 'actioned'];
       const statusParam = req.query.status as string | undefined;
       const status = statusParam && validStatuses.includes(statusParam) ? statusParam : undefined;
-      const reports = await storage.listAllReports(status);
+      const reports = await storage.getAdminReports(scheme, status);
       res.json(reports);
     } catch (error) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
-  // Update report status (admin only)
+  // PATCH /api/admin/reports/:id — update report status or add admin notes
   app.patch("/api/admin/reports/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     const adminId = req.userId || req.oidc?.user?.sub;
     const reportId = Number(req.params.id);
@@ -496,15 +567,49 @@ export async function registerRoutes(
     }
     try {
       const schema = z.object({
-        status: z.enum(['pending', 'reviewed', 'dismissed', 'actioned']),
+        status: z.enum(['pending', 'reviewed', 'dismissed', 'actioned']).optional(),
         adminNotes: z.string().optional(),
       });
       const input = schema.parse(req.body);
-      const report = await storage.updateReportStatus(reportId, input.status, adminId, input.adminNotes);
-      if (!report) return res.status(404).json({ message: "Report not found" });
+      const report = await storage.updateReportStatus(reportId, adminId, input);
       res.json(report);
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // POST /api/admin/reports/:id/deactivate — deactivate the reported user's account
+  app.post("/api/admin/reports/:id/deactivate", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const report = await storage.getReportById(Number(req.params.id));
+      if (!report) return res.status(404).json({ message: "Report not found" });
+      const reportId = Number(req.params.id);
+      const adminId = req.userId || req.oidc?.user?.sub;
+      const templateNotice = `Your account has been deactivated following an eSafety compliance review (reference: #${reportId}). This action was taken in accordance with Australian eSafety Commissioner guidelines. If you believe this decision is incorrect, please contact our support team to appeal.`;
+      await storage.deactivateUser(report.reportedUserId, templateNotice);
+      await storage.updateReportStatus(reportId, adminId, {
+        status: 'actioned',
+        adminNotes: (req.body?.adminNotes) || `Account deactivated. User notice: ${templateNotice}`,
+      });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // POST /api/admin/reports/:id/reverify — mark report as requiring re-verification
+  app.post("/api/admin/reports/:id/reverify", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const report = await storage.getReportById(Number(req.params.id));
+      if (!report) return res.status(404).json({ message: "Report not found" });
+      const adminId = req.userId || req.oidc?.user?.sub;
+      await storage.updateReportStatus(Number(req.params.id), adminId, {
+        status: 'reviewed',
+        adminNotes: 'Re-verification requested.',
+      });
+      res.json({ success: true });
+    } catch (error) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -653,10 +758,13 @@ export async function registerRoutes(
   app.post('/api/verify-age', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.userId || req.oidc?.user?.sub;
-      const { dateOfBirth } = req.body;
+      const { dateOfBirth, ageDeclarationAccepted } = req.body;
       
       if (!dateOfBirth) {
         return res.status(400).json({ success: false, message: 'Date of birth required' });
+      }
+      if (!ageDeclarationAccepted) {
+        return res.status(400).json({ success: false, message: 'You must confirm you are 16 or older to use DisabilitySquare' });
       }
 
       const dob = new Date(dateOfBirth);
@@ -674,23 +782,24 @@ export async function registerRoutes(
         });
       }
 
+      // Apply under-18 privacy protections for 16-17 year olds
+      const isUnder18 = age < 18;
+      const profileData: Record<string, any> = {
+        dateOfBirth: dob,
+        ageVerified: true,
+        ageVerifiedAt: new Date(),
+        ageDeclarationAt: new Date(), // always set — ageDeclarationAccepted is required above
+        ...(isUnder18 ? { visibility: 'members_only', dmRestricted: true } : {}),
+      };
+
       let profile = await storage.getProfile(userId);
       if (!profile) {
-        profile = await storage.createProfile({ 
-          userId, 
-          dateOfBirth: dob,
-          ageVerified: true,
-          ageVerifiedAt: new Date()
-        } as any);
+        profile = await storage.createProfile({ userId, ...profileData } as any);
       } else {
-        profile = await storage.updateProfile(userId, {
-          dateOfBirth: dob,
-          ageVerified: true,
-          ageVerifiedAt: new Date()
-        } as any);
+        profile = await storage.updateProfile(userId, profileData as any);
       }
 
-      res.json({ success: true, profile });
+      res.json({ success: true, profile, isUnder18 });
     } catch (error) {
       console.error('Age verification error:', error);
       res.status(500).json({ success: false, message: 'Verification failed' });
@@ -1278,11 +1387,23 @@ export async function registerRoutes(
   });
 
   // List threads in a category (public, no auth)
-  app.get("/api/forums/categories/:slug/threads", async (req, res) => {
+  app.get("/api/forums/categories/:slug/threads", async (req: any, res) => {
     try {
       const cat = await storage.getForumCategory(req.params.slug);
       if (!cat) return res.status(404).json({ message: "Category not found" });
       const threads = await storage.listForumThreads(cat.id);
+      // eSafety: anonymize members_only (16–17 yo) authors for unauthenticated requests
+      const requesterId = req.userId || req.oidc?.user?.sub;
+      if (!requesterId) {
+        const authorIds = [...new Set(threads.map((t: any) => t.author?.id).filter(Boolean))];
+        const protectedIds = await getMembersOnlyUserIds(authorIds);
+        if (protectedIds.size > 0) {
+          const anonymized = threads.map((t: any) =>
+            protectedIds.has(t.author?.id) ? { ...t, author: anonymizeAuthor(t.author) } : t
+          );
+          return res.json(anonymized);
+        }
+      }
       res.json(threads);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
@@ -1315,12 +1436,29 @@ export async function registerRoutes(
   });
 
   // Get thread detail with paginated replies (public, no auth)
-  app.get("/api/forums/threads/:id", async (req, res) => {
+  app.get("/api/forums/threads/:id", async (req: any, res) => {
     try {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
       const thread = await storage.getForumThread(parseInt(req.params.id), page, limit);
       if (!thread) return res.status(404).json({ message: "Thread not found" });
+      // eSafety: anonymize members_only (16–17 yo) authors for unauthenticated requests
+      const requesterId = req.userId || req.oidc?.user?.sub;
+      if (!requesterId) {
+        const authorIds = new Set<string>();
+        if (thread.author?.id) authorIds.add(thread.author.id);
+        (thread.replies || []).forEach((r: any) => { if (r.author?.id) authorIds.add(r.author.id); });
+        const protectedIds = await getMembersOnlyUserIds([...authorIds]);
+        if (protectedIds.size > 0) {
+          const anonymizedThread = protectedIds.has(thread.author?.id)
+            ? { ...thread, author: anonymizeAuthor(thread.author) }
+            : thread;
+          const anonymizedReplies = (thread.replies || []).map((r: any) =>
+            protectedIds.has(r.author?.id) ? { ...r, author: anonymizeAuthor(r.author) } : r
+          );
+          return res.json({ ...anonymizedThread, replies: anonymizedReplies, repliesPage: page, repliesLimit: limit });
+        }
+      }
       res.json({ ...thread, repliesPage: page, repliesLimit: limit });
     } catch (e: any) {
       res.status(500).json({ message: e.message });

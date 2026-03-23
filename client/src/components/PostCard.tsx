@@ -2,14 +2,20 @@ import { type Post } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Flag, MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useCreateComment } from "@/hooks/use-posts";
 import { Input } from "@/components/ui/input";
-import { ReportUserButton } from "@/components/ReportUserButton";
 import { TextToSpeech } from "@/components/TextToSpeech";
 import { useAuth } from "@/hooks/use-auth";
 import { PostReactions } from "@/components/PostReactions";
+import { ReportDialog } from "@/components/ReportDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type PostWithAuthor = Post & {
   author: {
@@ -24,6 +30,7 @@ type PostWithAuthor = Post & {
 export function PostCard({ post }: { post: PostWithAuthor }) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
   const createComment = useCreateComment();
   const { user } = useAuth();
 
@@ -53,12 +60,24 @@ export function PostCard({ post }: { post: PostWithAuthor }) {
           <span className="font-bold text-foreground text-sm leading-tight block truncate">{authorName}</span>
           <span className="text-muted-foreground text-[11px]">{timeAgo}</span>
         </div>
-        {post.author.id && post.author.id !== user?.id && (
-          <ReportUserButton
-            userId={post.author.id}
-            userName={authorName}
-            variant="dropdown"
-          />
+        {user && post.author.id && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" data-testid={`button-post-menu-${post.id}`}>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => setReportOpen(true)}
+                className="text-destructive focus:text-destructive"
+                data-testid={`button-report-post-${post.id}`}
+              >
+                <Flag className="h-4 w-4 mr-2" />
+                Report
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
 
@@ -144,6 +163,17 @@ export function PostCard({ post }: { post: PostWithAuthor }) {
             </div>
           )}
         </div>
+      )}
+
+      {post.author.id && (
+        <ReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          contentType="post"
+          contentId={post.id}
+          authorId={post.author.id}
+          authorName={authorName}
+        />
       )}
     </article>
   );
