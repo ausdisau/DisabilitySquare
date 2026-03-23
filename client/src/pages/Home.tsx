@@ -5,10 +5,11 @@ import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Layout } from "@/components/Layout";
 import { SEO } from "@/components/SEO";
 import { WellnessCheckIn } from "@/components/WellnessCheckIn";
-import { Clock, Users, MessageSquare, Star, RefreshCw } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { Clock, Users, MessageSquare, Star, RefreshCw, Shield } from "lucide-react";
+import { Link } from "wouter";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
-function RightSidebar() {
+function RightPanel() {
   const { data: leaderboard } = useQuery<any[]>({
     queryKey: ["/api/points/leaderboard"],
   });
@@ -17,78 +18,81 @@ function RightSidebar() {
   });
 
   return (
-    <aside className="w-44 shrink-0 hidden lg:block" aria-label="Community info">
-      {/* Community Stats box */}
-      <div className="retro-box">
-        <div className="retro-box-header">
-          <Users className="h-3 w-3" aria-hidden="true" />
-          Community
-        </div>
-        <div className="retro-box-content">
-          <div className="space-y-1.5 text-[11px]">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-600">Active Groups</span>
-              <span className="retro-stat">{groups?.length || 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-600">Top Members</span>
-              <span className="retro-stat">{leaderboard?.length || 0}</span>
-            </div>
+    <aside className="w-64 shrink-0 hidden lg:block pl-4" aria-label="Community info">
+      <div className="sticky top-20 space-y-3">
+        <div className="sm-card">
+          <div className="sm-card-title">
+            <Users className="h-4 w-4 text-primary" aria-hidden="true" />
+            Community
           </div>
-          <div className="retro-divider" />
-          <p className="text-[10px] text-gray-500 leading-relaxed">
-            Showing newest posts first. No algorithm — just people, in order.
-          </p>
+          <div className="sm-card-body space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Active Groups</span>
+              <span className="sm-stat">{groups?.length || 0}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Top Members</span>
+              <span className="sm-stat">{leaderboard?.length || 0}</span>
+            </div>
+            <div className="sm-divider" />
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Showing newest posts first. No algorithm — just people, in order.
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Top Members box */}
-      {leaderboard && leaderboard.length > 0 && (
-        <div className="retro-box">
-          <div className="retro-box-header">
-            <Star className="h-3 w-3" aria-hidden="true" />
-            Top Members
-          </div>
-          <div>
-            {leaderboard.slice(0, 5).map((entry: any, i: number) => (
-              <div key={entry.userId} className="retro-nav-link-sidebar justify-between">
-                <span className="flex items-center gap-1 truncate">
-                  <span className="text-gray-400 text-[10px] w-4 shrink-0">{i + 1}.</span>
-                  <span className="truncate text-[11px]">
+        {leaderboard && leaderboard.length > 0 && (
+          <div className="sm-card">
+            <div className="sm-card-title">
+              <Star className="h-4 w-4 text-accent" aria-hidden="true" />
+              Top Members
+            </div>
+            <div className="sm-card-body space-y-2">
+              {leaderboard.slice(0, 5).map((entry: any, i: number) => (
+                <div key={entry.userId} className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-xs w-4 shrink-0 text-center">{i + 1}</span>
+                  <Avatar className="h-7 w-7 rounded-full shrink-0">
+                    <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold rounded-full">
+                      {`${entry.user?.firstName?.[0] || ""}${entry.user?.lastName?.[0] || ""}`.toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="flex-1 text-sm truncate text-foreground">
                     {entry.user?.firstName} {entry.user?.lastName?.charAt(0)}.
                   </span>
-                </span>
-                <span className="retro-stat shrink-0">{entry.totalPoints}</span>
-              </div>
-            ))}
+                  <span className="sm-stat shrink-0">{entry.totalPoints}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Groups box */}
-      {groups && groups.length > 0 && (
-        <div className="retro-box">
-          <div className="retro-box-header">
-            <MessageSquare className="h-3 w-3" aria-hidden="true" />
-            Groups
+        {groups && groups.length > 0 && (
+          <div className="sm-card">
+            <div className="sm-card-title">
+              <MessageSquare className="h-4 w-4 text-primary" aria-hidden="true" />
+              Groups
+            </div>
+            <div className="sm-card-body space-y-1">
+              {groups.slice(0, 6).map((group: any) => (
+                <Link key={group.id} href={`/groups/${group.id}`}>
+                  <div className="text-sm text-foreground/80 hover:text-primary cursor-pointer py-1 truncate transition-colors">
+                    {group.name}
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
-          <div>
-            {groups.slice(0, 6).map((group: any) => (
-              <a key={group.id} href={`/groups/${group.id}`} className="retro-nav-link-sidebar">
-                <span className="truncate text-[11px]">{group.name}</span>
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
+        )}
 
-      {/* eSafety notice */}
-      <div className="retro-box">
-        <div className="retro-box-header">Safe Space</div>
-        <div className="retro-box-content">
-          <p className="text-[10px] text-gray-500 leading-relaxed">
-            🔒 This is a moderated, eSafety compliant community. Be kind. Report anything concerning.
-          </p>
+        <div className="sm-card">
+          <div className="sm-card-body">
+            <div className="flex items-start gap-2">
+              <Shield className="h-4 w-4 text-primary shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                This is a moderated, eSafety compliant community. Be kind. Report anything concerning.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </aside>
@@ -105,66 +109,52 @@ export default function Home() {
         description="See what's happening in your DisabilitySquare community. Share posts, connect with friends, and stay updated."
       />
 
-      {/* Page header */}
-      <div className="retro-box mb-3">
-        <div className="retro-box-header">
-          <Clock className="h-3 w-3" aria-hidden="true" />
-          Village Square — Bulletin Board
-          <span className="ml-auto font-normal normal-case tracking-normal text-blue-200 text-[10px]">
-            Chronological · Newest first
-          </span>
-        </div>
-        <div className="retro-box-content py-2 flex items-center justify-between">
-          <p className="text-[12px] text-gray-600">
-            What's happening in your community right now.
-          </p>
-          <div className="flex items-center gap-2">
+      <div className="flex gap-0">
+        <div className="flex-1 min-w-0 max-w-[620px]">
+          <div className="flex items-center justify-between mb-4 px-1">
+            <h1 className="text-lg font-bold text-foreground">Latest</h1>
             <button
               onClick={() => refetch()}
-              className="flex items-center gap-1 text-[11px] text-[#1B4B8A] hover:text-[#E07830]"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors px-3 py-1.5 rounded-full hover:bg-muted"
               aria-label="Refresh posts"
+              data-testid="button-refresh-posts"
             >
-              <RefreshCw className="h-3 w-3" />
+              <RefreshCw className="h-3.5 w-3.5" />
               Refresh
             </button>
-            <CreatePostDialog />
           </div>
-        </div>
-      </div>
 
-      {/* Daily wellness check-in */}
-      <WellnessCheckIn />
+          <WellnessCheckIn />
 
-      {/* 2-column layout: feed + right sidebar */}
-      <div className="flex gap-3">
-        {/* Main feed column */}
-        <div className="flex-1 min-w-0">
           {isLoading ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="retro-post animate-pulse">
-                  <div className="retro-post-header bg-[#eef2f8] h-8" />
-                  <div className="retro-post-body">
-                    <div className="h-3 bg-gray-200 rounded w-1/3 mb-2" />
-                    <div className="h-10 bg-gray-100 rounded" />
+                <div key={i} className="sm-post animate-pulse p-4">
+                  <div className="flex gap-3">
+                    <div className="h-10 w-10 rounded-full bg-muted shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 bg-muted rounded-full w-1/4" />
+                      <div className="h-3 bg-muted rounded-full w-3/4" />
+                      <div className="h-12 bg-muted rounded-xl" />
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           ) : posts?.length === 0 ? (
-            <div className="retro-box">
-              <div className="retro-box-content text-center py-8">
-                <p className="text-[13px] text-gray-500 mb-3">
-                  The bulletin board is empty. Be the first to post!
+            <div className="sm-card">
+              <div className="sm-card-body text-center py-10">
+                <p className="text-sm text-muted-foreground mb-4">
+                  The village square is quiet. Be the first to post!
                 </p>
                 <CreatePostDialog />
               </div>
             </div>
           ) : (
             <div>
-              <p className="text-[11px] text-gray-400 mb-2 flex items-center gap-1">
+              <p className="text-xs text-muted-foreground mb-3 px-1 flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                {posts?.length} post{posts?.length !== 1 ? "s" : ""} · shown in order of newest first · no algorithm
+                {posts?.length} post{posts?.length !== 1 ? "s" : ""} · newest first · no algorithm
               </p>
               {posts?.map((post) => (
                 <PostCard key={post.id} post={post} />
@@ -173,8 +163,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* Right sidebar */}
-        <RightSidebar />
+        <RightPanel />
       </div>
     </Layout>
   );

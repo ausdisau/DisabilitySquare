@@ -5,6 +5,8 @@ import {
   Home, Users, Gamepad2, User, Trophy, Puzzle,
   Spline, BookOpen, Building2, BookMarked, Briefcase, Bus, Star, HeartHandshake, MessageCircle,
 } from "lucide-react";
+import { CreatePostDialog } from "./CreatePostDialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const navItems = [
   { href: "/", label: "Village Square", icon: Home },
@@ -29,96 +31,60 @@ export function Sidebar() {
   const { data: myPoints } = useMyPoints();
 
   const initials = `${user?.firstName?.[0] || ""}${user?.lastName?.[0] || ""}`.toUpperCase();
+  const fullName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "Member";
 
   return (
-    <nav role="navigation" aria-label="Main navigation" className="w-full">
-      {/* My Profile Box */}
-      <div className="retro-box">
-        <div className="retro-box-header">
-          <User className="h-3 w-3" aria-hidden="true" />
-          My Profile
-        </div>
-        <div className="retro-box-content">
-          <div className="flex items-center gap-2 mb-2">
-            <div
-              className="h-9 w-9 rounded-sm bg-[#1B4B8A] flex items-center justify-center text-white text-xs font-bold shrink-0 border border-[#0e2f5a]"
-              aria-hidden="true"
-            >
-              {initials || "?"}
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-bold text-[#1B4B8A] truncate leading-tight">
-                {user?.firstName} {user?.lastName}
-              </p>
-              <p className="text-[10px] text-gray-500 truncate">{user?.email}</p>
-            </div>
-          </div>
-
-          {myPoints && (
-            <Link href="/recognition">
+    <nav role="navigation" aria-label="Main navigation" className="w-full flex flex-col h-full py-4 px-3">
+      <div className="flex-1 space-y-1">
+        {navItems.map((item) => {
+          const isActive = location === item.href;
+          return (
+            <Link key={item.href} href={item.href}>
               <div
-                className="text-[11px] border border-[#c8d0dc] bg-[#f6f8fb] p-1.5 mb-2 cursor-pointer hover:bg-[#eef2f8]"
-                data-testid="card-my-points"
-                role="status"
-                aria-label={`${myPoints.totalPoints} points, Level ${myPoints.level}`}
+                className={`sm-nav-link ${isActive ? "active" : ""}`}
+                data-testid={`link-nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                aria-current={isActive ? "page" : undefined}
               >
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-[#1B4B8A]">
-                    <Star className="h-3 w-3" aria-hidden="true" />
-                    Points
-                  </span>
-                  <span className="font-mono font-bold text-[#E07830]" data-testid="text-my-points">
-                    {myPoints.totalPoints}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between mt-0.5">
-                  <span className="text-gray-500">Level</span>
-                  <span className="font-bold text-[#2A9D8F]">{myPoints.level}</span>
-                </div>
+                <item.icon
+                  className={`sm-nav-icon h-5 w-5 shrink-0 ${isActive ? "text-primary" : "text-foreground/70"}`}
+                  aria-hidden="true"
+                />
+                <span>{item.label}</span>
               </div>
             </Link>
-          )}
-        </div>
+          );
+        })}
       </div>
 
-      {/* Navigation Box */}
-      <div className="retro-box">
-        <div className="retro-box-header">
-          <Home className="h-3 w-3" aria-hidden="true" />
-          Navigation
-        </div>
-        <div>
-          {navItems.map((item) => {
-            const isActive = location === item.href;
-            return (
-              <Link key={item.href} href={item.href}>
-                <div
-                  className={`retro-nav-link-sidebar ${isActive ? "active" : ""}`}
-                  data-testid={`link-nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  <item.icon className="h-3 w-3 shrink-0" aria-hidden="true" />
-                  <span>{item.label}</span>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+      <div className="mt-4 px-1">
+        <CreatePostDialog />
       </div>
 
-      {/* About Box */}
-      <div className="retro-box">
-        <div className="retro-box-header">About</div>
-        <div className="retro-box-content">
-          <p className="text-[10px] text-gray-600 leading-relaxed">
-            DisabilitySquare is a safe, accessible community for people with disabilities. No algorithms — just people.
-          </p>
-          <div className="retro-divider" />
-          <p className="text-[10px] text-gray-500">
-            🇦🇺 Australian eSafety compliant · 16+ · WCAG AAA
-          </p>
+      <div className="sm-divider mt-4" />
+
+      <Link href="/profile">
+        <div
+          className="flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-muted cursor-pointer transition-colors"
+          data-testid="link-user-profile"
+          aria-label={`Go to ${fullName}'s profile`}
+        >
+          <Avatar className="h-9 w-9 shrink-0">
+            <AvatarImage src={user?.profileImageUrl || undefined} />
+            <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
+              {initials || "?"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground truncate">{fullName}</p>
+            {myPoints && (
+              <p className="text-xs text-muted-foreground" data-testid="text-my-points">
+                <Star className="h-3 w-3 inline mr-0.5 text-accent" aria-hidden="true" />
+                {myPoints.totalPoints} pts · Lv {myPoints.level}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      </Link>
     </nav>
   );
 }

@@ -41,7 +41,7 @@
     --input: 213 20% 85%;
     --ring: 213 67% 33%;
     
-    --radius: 0.2rem;
+    --radius: 0.75rem;
     
     --sidebar-background: 213 67% 28%;
     --sidebar-foreground: 40 23% 95%;
@@ -288,146 +288,121 @@
 }
 
 /* =============================================
-   2004-ERA RETRO SOCIAL NETWORK STYLES
+   SOCIAL MEDIA-LITE DESIGN TOKENS (sm-*)
    ============================================= */
 
-/* Retro section box — the core 2004 UI pattern */
-.retro-box {
-  border: 1px solid #b0b8c8;
-  background: #fff;
-  margin-bottom: 8px;
+/* Modern card — subtle shadow, rounded, no thick borders */
+.sm-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border) / 0.6);
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  margin-bottom: 12px;
 }
-.retro-box-header {
-  background: #1B4B8A;
-  color: #fff;
-  font-size: 11px;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 3px 8px;
+
+/* Section heading inside a card */
+.sm-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  letter-spacing: 0.01em;
+  padding: 12px 16px 0;
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.retro-box-content {
-  padding: 8px;
+
+/* Content area inside a card */
+.sm-card-body {
+  padding: 12px 16px;
 }
 
-/* Retro post card — boxy wall post style */
-.retro-post {
-  border: 1px solid #c8d0dc;
-  background: #fff;
-  margin-bottom: 8px;
+/* Social post card */
+.sm-post {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border) / 0.5);
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  margin-bottom: 10px;
+  transition: box-shadow 0.15s ease;
 }
-.retro-post-header {
-  background: #eef2f8;
-  border-bottom: 1px solid #c8d0dc;
-  padding: 6px 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-.retro-post-body {
-  padding: 10px;
-  font-size: 13px;
-  line-height: 1.5;
-}
-.retro-post-footer {
-  background: #f6f8fb;
-  border-top: 1px solid #e0e6ef;
-  padding: 5px 10px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
+.sm-post:hover {
+  box-shadow: 0 3px 8px rgba(0,0,0,0.09);
 }
 
-/* Retro top navigation bar */
-.retro-topbar {
-  background: #1B4B8A;
-  color: #fff;
-  height: 40px;
+/* Modern top navigation bar */
+.sm-topbar {
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border) / 0.6);
+  height: 56px;
   display: flex;
   align-items: center;
-  padding: 0 12px;
+  padding: 0 16px;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 60;
-  border-bottom: 2px solid #E07830;
-  font-size: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 
-/* Retro nav link */
-.retro-nav-link {
-  color: #ddeeff;
-  text-decoration: none;
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 2px;
+/* Stat badge — accent pill */
+.sm-stat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  min-width: 22px;
 }
-.retro-nav-link:hover,
-.retro-nav-link.active {
-  background: #E07830;
-  color: #fff;
+
+/* Tag/badge pill */
+.sm-badge {
+  display: inline-flex;
+  align-items: center;
+  background: hsl(170 56% 45% / 0.12);
+  color: hsl(170 56% 32%);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
 }
-.retro-nav-link-sidebar {
+
+/* Left nav link (Twitter-style) */
+.sm-nav-link {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  font-size: 12px;
-  color: #1B4B8A;
+  gap: 14px;
+  padding: 11px 16px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 500;
+  color: hsl(var(--foreground));
   text-decoration: none;
-  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.12s ease, color 0.12s ease;
+  cursor: pointer;
 }
-.retro-nav-link-sidebar:hover {
-  background: #eef2f8;
-  color: #E07830;
+.sm-nav-link:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--primary));
 }
-.retro-nav-link-sidebar.active {
-  background: #1B4B8A;
-  color: #fff;
-  font-weight: bold;
+.sm-nav-link.active {
+  font-weight: 700;
+  color: hsl(var(--primary));
 }
-
-/* Retro sidebar */
-.retro-sidebar {
-  width: 200px;
-  flex-shrink: 0;
+.sm-nav-link.active .sm-nav-icon {
+  color: hsl(var(--primary));
 }
 
-/* Retro divider */
-.retro-divider {
+/* Divider */
+.sm-divider {
   height: 1px;
-  background: #c8d0dc;
-  margin: 6px 0;
-}
-
-/* Retro stat badge */
-.retro-stat {
-  display: inline-block;
-  background: #E07830;
-  color: #fff;
-  font-size: 10px;
-  font-weight: bold;
-  padding: 1px 5px;
-  border-radius: 2px;
-  min-width: 18px;
-  text-align: center;
-}
-
-/* Retro badge pill */
-.retro-badge {
-  display: inline-block;
-  background: #2A9D8F;
-  color: #fff;
-  font-size: 10px;
-  font-weight: bold;
-  padding: 1px 6px;
-  border-radius: 2px;
+  background: hsl(var(--border) / 0.5);
+  margin: 8px 0;
 }
 
 /* Keyboard shortcut badge styles */
