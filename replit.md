@@ -253,6 +253,42 @@ Component: `client/src/components/WellnessCheckIn.tsx`
 - eSafety compliance (16+ age gate, content moderation)
 - Australian service providers seeded
 
+## Community Forums (`/forums`)
+
+A structured, pre-algorithmic bulletin board system for peer advice and community discussion.
+
+### Features
+- **8 categories**: Mental Health, Mobility & Physical, Chronic Pain, NDIS & Funding, Daily Living, Diagnosis & Medical, Work & Employment, General Discussion
+- **Thread types**: General discussion OR Advice Request (with accepted answer marking)
+- **Upvoting**: Members can upvote threads and replies (one vote per entity per user, toggleable)
+- **Accepted Answer**: Original poster can mark one reply as the accepted answer on Advice Request threads — pinned at top
+- **Valorization**: Thread creation (+15pts), thoughtful reply (+10pts), reply (+5pts), accepted answer (+20pts)
+- **Retro design**: Matches site aesthetic with retro-box, retro-post components
+
+### API Endpoints
+- `GET /api/forums/categories` — List all categories
+- `GET /api/forums/categories/:slug` — Get category by slug
+- `GET /api/forums/categories/:slug/threads` — List threads (by lastActivityAt desc)
+- `POST /api/forums/categories/:slug/threads` — Create thread
+- `GET /api/forums/threads/:id` — Get thread with replies
+- `POST /api/forums/threads/:id/replies` — Post reply
+- `POST /api/forums/threads/:id/vote` — Toggle upvote on thread
+- `POST /api/forums/replies/:id/vote` — Toggle upvote on reply
+- `POST /api/forums/votes/bulk` — Get user's votes for multiple entities
+- `POST /api/forums/replies/:id/accept` — Mark reply as accepted answer
+
+### Database Tables
+- `forum_categories`: id, name, slug, description, icon, threadCount, lastActivityAt, sortOrder
+- `forum_threads`: id, categoryId, authorId, title, body, isAdviceRequest, isSolved, mediaUrls, upvotesCount, replyCount, tags, lastActivityAt, createdAt
+- `forum_replies`: id, threadId, authorId, body, isAcceptedAnswer, mediaUrls, upvotesCount, createdAt
+- `forum_votes`: id, userId, entityType, entityId, createdAt (unique per userId+entityType+entityId)
+
+### Frontend Pages
+- `client/src/pages/Forums.tsx` — Category list
+- `client/src/pages/ForumCategory.tsx` — Thread list for a category
+- `client/src/pages/ForumThread.tsx` — Thread detail with replies and reply composer
+- `client/src/components/CreateThreadDialog.tsx` — Modal form to create threads
+
 ## Recent Changes
 
 - Integrated Auth0 authentication

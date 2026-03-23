@@ -6,6 +6,7 @@ import {
   spoonStatus, journalEntries, serviceProviders, resources, savedResources, jobListings,
   transportProviders, transportVehicles, tripQuotes, trips,
   postReactions,
+  forumCategories, forumThreads, forumReplies, forumVotes,
   type User, type InsertUser,
   type Profile, type InsertProfile,
   type Group, type InsertGroup,
@@ -27,6 +28,9 @@ import {
   type TripQuote, type InsertTripQuote,
   type Trip, type InsertTrip,
   type PostReaction,
+  type ForumCategory, type InsertForumCategory,
+  type ForumThread, type InsertForumThread,
+  type ForumReply, type InsertForumReply,
   POINT_VALUES
 } from "@shared/schema";
 
@@ -112,6 +116,17 @@ export interface IStorage {
   // Peer Connect — find users with matching diagnosis or interests
   getPeerMatches(userId: string, limit?: number): Promise<(User & { profile: Profile | null })[]>;
   listAllProfiles(): Promise<(User & { profile: Profile | null })[]>;
+
+  // Community Forums
+  listForumCategories(): Promise<ForumCategory[]>;
+  getForumCategory(slug: string): Promise<ForumCategory | undefined>;
+  listForumThreads(categoryId: number, limit?: number): Promise<(ForumThread & { author: User })[]>;
+  getForumThread(id: number): Promise<(ForumThread & { author: User; replies: (ForumReply & { author: User })[] }) | undefined>;
+  createForumThread(data: InsertForumThread, authorId: string): Promise<ForumThread>;
+  createForumReply(data: InsertForumReply, authorId: string): Promise<ForumReply>;
+  toggleForumVote(userId: string, entityType: string, entityId: number): Promise<{ voted: boolean; count: number }>;
+  getUserForumVotes(userId: string, entityType: string, entityIds: number[]): Promise<number[]>;
+  markAcceptedAnswer(threadId: number, replyId: number, requestingUserId: string): Promise<void>;
 
   // Transport Module
   seedTransportProviders(): Promise<void>;
@@ -777,6 +792,112 @@ export class DatabaseStorage implements IStorage {
       with: { profile: true },
       limit: 100,
     }) as any;
+  }
+
+  // === COMMUNITY FORUMS ===
+
+  async listForumCategories(): Promise<ForumCategory[]> {
+    return db.select().from(forumCategories).orderBy(forumCategories.sortOrder);
+  }
+
+  async getForumCategory(slug: string): Promise<ForumCategory | undefined> {
+    const [cat] = await db.select().from(forumCategories).where(eq(forumCategories.slug, slug));
+    return cat;
+  }
+
+  async listForumThreads(categoryId: number, limit = 30): Promise<(ForumThread & { author: User })[]> {
+    return db.query.forumThreads.findMany({
+      where: eq(forumThreads.categoryId, categoryId),
+      orderBy: [desc(forumThreads.lastActivityAt)],
+      with: { author: true },
+      limit,
+    }) as any;
+  }
+
+  async getForumThread(id: number): Promise<(ForumThread & { author: User; replies: (ForumReply & { author: User })[] }) | undefined> {
+    const thread = await db.query.forumThreads.findFirst({
+      where: eq(forumThreads.id, id),
+      with: {
+        author: true,
+        replies: {
+          orderBy: [forumReplies.createdAt],
+          with: { author: true },
+        },
+      },
+    });
+    return thread as any;
+  }
+
+  async createForumThread(data: InsertForumThread, authorId: string): Promise<ForumThread> {
+    const [thread] = await db.insert(forumThreads).values({ ...data, authorId }).returning();
+    // Update category thread count and lastActivityAt
+    await db.update(forumCategories)
+      .set({ threadCount: sql`${forumCategories.threadCount} + 1`, lastActivityAt: new Date() })
+      .where(eq(forumCategories.id, data.categoryId));
+    return thread;
+  }
+
+  async createForumReply(data: InsertForumReply, authorId: string): Promise<ForumReply> {
+    const [reply] = await db.insert(forumReplies).values({ ...data, authorId }).returning();
+    // Update thread reply count and lastActivityAt
+    await db.update(forumThreads)
+      .set({ replyCount: sql`${forumThreads.replyCount} + 1`, lastActivityAt: new Date() })
+      .where(eq(forumThreads.id, data.threadId));
+    // Also update category lastActivityAt
+    const [thread] = await db.select({ categoryId: forumThreads.categoryId }).from(forumThreads).where(eq(forumThreads.id, data.threadId));
+    if (thread) {
+      await db.update(forumCategories).set({ lastActivityAt: new Date() }).where(eq(forumCategories.id, thread.categoryId));
+    }
+    return reply;
+  }
+
+  async toggleForumVote(userId: string, entityType: string, entityId: number): Promise<{ voted: boolean; count: number }> {
+    const [existing] = await db.select().from(forumVotes).where(
+      and(eq(forumVotes.userId, userId), eq(forumVotes.entityType, entityType), eq(forumVotes.entityId, entityId))
+    );
+    if (existing) {
+      await db.delete(forumVotes).where(eq(forumVotes.id, existing.id));
+      // Decrement upvote count
+      if (entityType === 'thread') {
+        await db.update(forumThreads).set({ upvotesCount: sql`${forumThreads.upvotesCount} - 1` }).where(eq(forumThreads.id, entityId));
+        const [t] = await db.select({ upvotesCount: forumThreads.upvotesCount }).from(forumThreads).where(eq(forumThreads.id, entityId));
+        return { voted: false, count: t?.upvotesCount ?? 0 };
+      } else {
+        await db.update(forumReplies).set({ upvotesCount: sql`${forumReplies.upvotesCount} - 1` }).where(eq(forumReplies.id, entityId));
+        const [r] = await db.select({ upvotesCount: forumReplies.upvotesCount }).from(forumReplies).where(eq(forumReplies.id, entityId));
+        return { voted: false, count: r?.upvotesCount ?? 0 };
+      }
+    } else {
+      await db.insert(forumVotes).values({ userId, entityType, entityId });
+      if (entityType === 'thread') {
+        await db.update(forumThreads).set({ upvotesCount: sql`${forumThreads.upvotesCount} + 1` }).where(eq(forumThreads.id, entityId));
+        const [t] = await db.select({ upvotesCount: forumThreads.upvotesCount }).from(forumThreads).where(eq(forumThreads.id, entityId));
+        return { voted: true, count: t?.upvotesCount ?? 1 };
+      } else {
+        await db.update(forumReplies).set({ upvotesCount: sql`${forumReplies.upvotesCount} + 1` }).where(eq(forumReplies.id, entityId));
+        const [r] = await db.select({ upvotesCount: forumReplies.upvotesCount }).from(forumReplies).where(eq(forumReplies.id, entityId));
+        return { voted: true, count: r?.upvotesCount ?? 1 };
+      }
+    }
+  }
+
+  async getUserForumVotes(userId: string, entityType: string, entityIds: number[]): Promise<number[]> {
+    if (!entityIds.length) return [];
+    const votes = await db.select({ entityId: forumVotes.entityId }).from(forumVotes).where(
+      and(eq(forumVotes.userId, userId), eq(forumVotes.entityType, entityType), inArray(forumVotes.entityId, entityIds))
+    );
+    return votes.map(v => v.entityId);
+  }
+
+  async markAcceptedAnswer(threadId: number, replyId: number, requestingUserId: string): Promise<void> {
+    const [thread] = await db.select().from(forumThreads).where(eq(forumThreads.id, threadId));
+    if (!thread || thread.authorId !== requestingUserId) throw new Error("Not authorized");
+    // Clear existing accepted answer on this thread
+    await db.update(forumReplies).set({ isAcceptedAnswer: false }).where(eq(forumReplies.threadId, threadId));
+    // Set new accepted answer
+    await db.update(forumReplies).set({ isAcceptedAnswer: true }).where(eq(forumReplies.id, replyId));
+    // Mark thread as solved
+    await db.update(forumThreads).set({ isSolved: true }).where(eq(forumThreads.id, threadId));
   }
 }
 

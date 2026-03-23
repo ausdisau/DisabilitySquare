@@ -27,6 +27,9 @@ import Resources from "@/pages/Resources";
 import JobBoard from "@/pages/JobBoard";
 import Transport from "@/pages/Transport";
 import Connect from "@/pages/Connect";
+import Forums from "@/pages/Forums";
+import ForumCategory from "@/pages/ForumCategory";
+import ForumThread from "@/pages/ForumThread";
 import NotFound from "@/pages/not-found";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
@@ -86,6 +89,9 @@ function Router() {
       <Route path="/jobs" component={props => <PrivateRoute component={JobBoard} {...props} />} />
       <Route path="/transport" component={Transport} />
       <Route path="/connect" component={props => <PrivateRoute component={Connect} {...props} />} />
+      <Route path="/forums" component={props => <PrivateRoute component={Forums} {...props} />} />
+      <Route path="/forums/:slug" component={props => <PrivateRoute component={ForumCategory} {...props} />} />
+      <Route path="/forums/:slug/:threadId" component={props => <PrivateRoute component={ForumThread} {...props} />} />
       <Route component={NotFound} />
     </Switch>
   );

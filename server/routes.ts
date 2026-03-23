@@ -1108,5 +1108,156 @@ export async function registerRoutes(
     }
   });
 
+  // === COMMUNITY FORUMS ===
+
+  // List all categories
+  app.get("/api/forums/categories", isAuthenticated, async (req, res) => {
+    try {
+      const categories = await storage.listForumCategories();
+      res.json(categories);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Get category by slug
+  app.get("/api/forums/categories/:slug", isAuthenticated, async (req, res) => {
+    try {
+      const cat = await storage.getForumCategory(req.params.slug);
+      if (!cat) return res.status(404).json({ message: "Category not found" });
+      res.json(cat);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // List threads in a category
+  app.get("/api/forums/categories/:slug/threads", isAuthenticated, async (req, res) => {
+    try {
+      const cat = await storage.getForumCategory(req.params.slug);
+      if (!cat) return res.status(404).json({ message: "Category not found" });
+      const threads = await storage.listForumThreads(cat.id);
+      res.json(threads);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Create a thread
+  app.post("/api/forums/categories/:slug/threads", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).userId || (req as any).oidc?.user?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const cat = await storage.getForumCategory(req.params.slug);
+      if (!cat) return res.status(404).json({ message: "Category not found" });
+      const { title, body, isAdviceRequest, tags, mediaUrls } = req.body;
+      if (!title?.trim() || !body?.trim()) return res.status(400).json({ message: "Title and body required" });
+      const thread = await storage.createForumThread({
+        categoryId: cat.id,
+        title: title.trim(),
+        body: body.trim(),
+        isAdviceRequest: !!isAdviceRequest,
+        tags: tags || [],
+        mediaUrls: mediaUrls || [],
+      }, userId);
+      // Award points for starting a thread
+      await storage.awardPoints({ userId, points: 15, actionType: "forum_thread", description: "Started a forum thread" });
+      res.status(201).json(thread);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Get thread detail with replies
+  app.get("/api/forums/threads/:id", isAuthenticated, async (req, res) => {
+    try {
+      const thread = await storage.getForumThread(parseInt(req.params.id));
+      if (!thread) return res.status(404).json({ message: "Thread not found" });
+      res.json(thread);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Create a reply
+  app.post("/api/forums/threads/:id/replies", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).userId || (req as any).oidc?.user?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const threadId = parseInt(req.params.id);
+      const { body, mediaUrls } = req.body;
+      if (!body?.trim()) return res.status(400).json({ message: "Reply body required" });
+      const reply = await storage.createForumReply({ threadId, body: body.trim(), mediaUrls: mediaUrls || [] }, userId);
+      // Award points for replying
+      const points = body.length >= 100 ? 10 : 5;
+      await storage.awardPoints({ userId, points, actionType: "forum_reply", description: "Replied to a forum thread" });
+      res.status(201).json(reply);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Toggle vote on a thread
+  app.post("/api/forums/threads/:id/vote", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).userId || (req as any).oidc?.user?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const result = await storage.toggleForumVote(userId, "thread", parseInt(req.params.id));
+      if (result.voted) {
+        await storage.awardPoints({ userId, points: 2, actionType: "forum_upvote_given", description: "Upvoted a forum thread" });
+      }
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Toggle vote on a reply
+  app.post("/api/forums/replies/:id/vote", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).userId || (req as any).oidc?.user?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const result = await storage.toggleForumVote(userId, "reply", parseInt(req.params.id));
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Get user votes for threads or replies
+  app.post("/api/forums/votes/bulk", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).userId || (req as any).oidc?.user?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const { entityType, entityIds } = req.body;
+      const votedIds = await storage.getUserForumVotes(userId, entityType, entityIds || []);
+      res.json({ votedIds });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Mark accepted answer (only thread author)
+  app.post("/api/forums/replies/:id/accept", isAuthenticated, async (req, res) => {
+    try {
+      const userId = (req as any).userId || (req as any).oidc?.user?.sub;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const { threadId } = req.body;
+      if (!threadId) return res.status(400).json({ message: "threadId required" });
+      await storage.markAcceptedAnswer(parseInt(threadId), parseInt(req.params.id), userId);
+      // Award points to the reply author
+      const thread = await storage.getForumThread(parseInt(threadId));
+      if (thread) {
+        const reply = thread.replies.find(r => r.id === parseInt(req.params.id));
+        if (reply) {
+          await storage.awardPoints({ userId: reply.authorId, points: 20, actionType: "accepted_answer", description: "Reply marked as accepted answer" });
+        }
+      }
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(e.message === "Not authorized" ? 403 : 500).json({ message: e.message });
+    }
+  });
+
   return httpServer;
 }

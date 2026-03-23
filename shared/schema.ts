@@ -439,6 +439,89 @@ export interface ExtensionManifest {
   defaultConfig?: Record<string, any>;
 }
 
+// === COMMUNITY FORUMS ===
+
+export const forumCategories = pgTable("forum_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description").notNull(),
+  icon: text("icon").notNull().default("MessageSquare"), // lucide icon name
+  threadCount: integer("thread_count").notNull().default(0),
+  lastActivityAt: timestamp("last_activity_at").defaultNow(),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const forumThreads = pgTable("forum_threads", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").notNull().references(() => forumCategories.id),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  isAdviceRequest: boolean("is_advice_request").notNull().default(false),
+  isSolved: boolean("is_solved").notNull().default(false),
+  mediaUrls: text("media_urls").array().default([]),
+  upvotesCount: integer("upvotes_count").notNull().default(0),
+  replyCount: integer("reply_count").notNull().default(0),
+  tags: jsonb("tags").$type<string[]>().default([]),
+  lastActivityAt: timestamp("last_activity_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const forumReplies = pgTable("forum_replies", {
+  id: serial("id").primaryKey(),
+  threadId: integer("thread_id").notNull().references(() => forumThreads.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  isAcceptedAnswer: boolean("is_accepted_answer").notNull().default(false),
+  mediaUrls: text("media_urls").array().default([]),
+  upvotesCount: integer("upvotes_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const forumVotes = pgTable("forum_votes", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  entityType: text("entity_type").notNull(), // 'thread' | 'reply'
+  entityId: integer("entity_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniqueVote: unique("unique_forum_vote").on(table.userId, table.entityType, table.entityId),
+}));
+
+export const forumCategoriesRelations = relations(forumCategories, ({ many }) => ({
+  threads: many(forumThreads),
+}));
+
+export const forumThreadsRelations = relations(forumThreads, ({ one, many }) => ({
+  category: one(forumCategories, { fields: [forumThreads.categoryId], references: [forumCategories.id] }),
+  author: one(users, { fields: [forumThreads.authorId], references: [users.id] }),
+  replies: many(forumReplies),
+}));
+
+export const forumRepliesRelations = relations(forumReplies, ({ one }) => ({
+  thread: one(forumThreads, { fields: [forumReplies.threadId], references: [forumThreads.id] }),
+  author: one(users, { fields: [forumReplies.authorId], references: [users.id] }),
+}));
+
+export const forumVotesRelations = relations(forumVotes, ({ one }) => ({
+  user: one(users, { fields: [forumVotes.userId], references: [users.id] }),
+}));
+
+export const insertForumCategorySchema = createInsertSchema(forumCategories).omit({ id: true, threadCount: true, lastActivityAt: true });
+export const insertForumThreadSchema = createInsertSchema(forumThreads).omit({ id: true, authorId: true, upvotesCount: true, replyCount: true, lastActivityAt: true, createdAt: true });
+export const insertForumReplySchema = createInsertSchema(forumReplies).omit({ id: true, authorId: true, isAcceptedAnswer: true, upvotesCount: true, createdAt: true });
+export const insertForumVoteSchema = createInsertSchema(forumVotes).omit({ id: true, userId: true, createdAt: true });
+
+export type ForumCategory = typeof forumCategories.$inferSelect;
+export type InsertForumCategory = z.infer<typeof insertForumCategorySchema>;
+export type ForumThread = typeof forumThreads.$inferSelect;
+export type InsertForumThread = z.infer<typeof insertForumThreadSchema>;
+export type ForumReply = typeof forumReplies.$inferSelect;
+export type InsertForumReply = z.infer<typeof insertForumReplySchema>;
+export type ForumVote = typeof forumVotes.$inferSelect;
+export type InsertForumVote = z.infer<typeof insertForumVoteSchema>;
+
 // === USER REPORTS (for safety/eSafety compliance) ===
 export const userReports = pgTable("user_reports", {
   id: serial("id").primaryKey(),
