@@ -616,66 +616,134 @@ export type JobListing = typeof jobListings.$inferSelect;
 export type InsertJobListing = z.infer<typeof insertJobListingSchema>;
 
 // === TRANSPORT MODULE ===
+
 export const transportProviders = pgTable("transport_providers", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  description: text("description").notNull(),
-  type: text("type").notNull(), // 'public_transport' | 'taxi' | 'rideshare' | 'community_transport' | 'ndis_transport'
-  state: text("state").notNull(), // 'NSW' | 'VIC' | 'QLD' | 'WA' | 'SA' | 'TAS' | 'ACT' | 'NT' | 'National'
-  phone: text("phone"),
-  website: text("website"),
-  email: text("email"),
-  isNdisRegistered: boolean("is_ndis_registered").default(false),
-  isWheelchairAccessible: boolean("is_wheelchair_accessible").default(false),
-  acceptsCompanionCard: boolean("accepts_companion_card").default(false),
-  isNdisTransportFunded: boolean("is_ndis_transport_funded").default(false), // Can use NDIS transport support category
-  features: jsonb("features").$type<string[]>().default([]), // e.g. 'ramp', 'hoist', 'trained_driver', 'door_to_door'
-  approved: boolean("approved").default(false),
-  submittedById: varchar("submitted_by_id").references(() => users.id),
+  kind: text("kind").notNull(), // 'wat' (wheelchair accessible), 'rideshare', 'taxi', 'community_transport'
+  ndisSupport: boolean("ndis_support").default(false),
+  rateCard: jsonb("rate_card").$type<{
+    baseFare: number;
+    perKm: number;
+    perMinute: number;
+    wheelchairSurcharge: number;
+    rampSurcharge: number;
+    driverAssistanceSurcharge: number;
+  }>().notNull(),
+  adapterKey: text("adapter_key").notNull().default("zoomly_manual"), // 'zoomly_manual' | 'uber_guest'
+  active: boolean("active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const transportProvidersRelations = relations(transportProviders, ({ one }) => ({
-  submittedBy: one(users, {
-    fields: [transportProviders.submittedById],
+export const transportVehicles = pgTable("transport_vehicles", {
+  id: serial("id").primaryKey(),
+  providerId: integer("provider_id").notNull().references(() => transportProviders.id),
+  vehicleType: text("vehicle_type").notNull(), // 'wheelchair_van', 'sedan', 'suv', 'minibus'
+  capacity: integer("capacity").notNull().default(4),
+  accessibilityFeatures: jsonb("accessibility_features").$type<string[]>().default([]),
+  lat: text("lat").notNull(),
+  lng: text("lng").notNull(),
+  available: boolean("available").default(true),
+});
+
+export const tripQuotes = pgTable("trip_quotes", {
+  id: serial("id").primaryKey(),
+  sessionId: text("session_id"), // guest session identifier
+  userId: varchar("user_id").references(() => users.id), // null for guests
+  pickupAddress: text("pickup_address").notNull(),
+  pickupLat: text("pickup_lat").notNull(),
+  pickupLng: text("pickup_lng").notNull(),
+  dropoffAddress: text("dropoff_address").notNull(),
+  dropoffLat: text("dropoff_lat").notNull(),
+  dropoffLng: text("dropoff_lng").notNull(),
+  accessNeeds: jsonb("access_needs").$type<string[]>().default([]),
+  companionCount: integer("companion_count").default(0),
+  fundingType: text("funding_type").default("private"), // 'ndis', 'private', 'transport_allowance'
+  distanceKm: text("distance_km"),
+  durationMinutes: integer("duration_minutes"),
+  options: jsonb("options").$type<Array<{
+    providerId: number;
+    providerName: string;
+    vehicleType: string;
+    etaMinutes: number;
+    priceAud: number;
+    ndisEligible: boolean;
+    vehicleId: number;
+  }>>().default([]),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const trips = pgTable("trips", {
+  id: serial("id").primaryKey(),
+  quoteId: integer("quote_id").notNull().references(() => tripQuotes.id),
+  providerId: integer("provider_id").notNull().references(() => transportProviders.id),
+  vehicleId: integer("vehicle_id").references(() => transportVehicles.id),
+  sessionId: text("session_id"),
+  userId: varchar("user_id").references(() => users.id),
+  pickupAddress: text("pickup_address").notNull(),
+  dropoffAddress: text("dropoff_address").notNull(),
+  priceAud: text("price_aud").notNull(),
+  status: text("status").notNull().default("pending"), // 'pending', 'confirmed', 'in_progress', 'completed', 'cancelled'
+  externalRef: text("external_ref"),
+  accessNeeds: jsonb("access_needs").$type<string[]>().default([]),
+  fundingType: text("funding_type").default("private"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const transportProvidersRelations = relations(transportProviders, ({ many }) => ({
+  vehicles: many(transportVehicles),
+  trips: many(trips),
+}));
+
+export const transportVehiclesRelations = relations(transportVehicles, ({ one }) => ({
+  provider: one(transportProviders, {
+    fields: [transportVehicles.providerId],
+    references: [transportProviders.id],
+  }),
+}));
+
+export const tripQuotesRelations = relations(tripQuotes, ({ one, many }) => ({
+  user: one(users, {
+    fields: [tripQuotes.userId],
+    references: [users.id],
+  }),
+  trips: many(trips),
+}));
+
+export const tripsRelations = relations(trips, ({ one }) => ({
+  quote: one(tripQuotes, {
+    fields: [trips.quoteId],
+    references: [tripQuotes.id],
+  }),
+  provider: one(transportProviders, {
+    fields: [trips.providerId],
+    references: [transportProviders.id],
+  }),
+  vehicle: one(transportVehicles, {
+    fields: [trips.vehicleId],
+    references: [transportVehicles.id],
+  }),
+  user: one(users, {
+    fields: [trips.userId],
     references: [users.id],
   }),
 }));
 
-export const insertTransportProviderSchema = createInsertSchema(transportProviders).omit({
-  id: true, submittedById: true, approved: true, createdAt: true,
-});
+export const insertTransportProviderSchema = createInsertSchema(transportProviders).omit({ id: true, createdAt: true });
+export const insertTransportVehicleSchema = createInsertSchema(transportVehicles).omit({ id: true });
+export const insertTripQuoteSchema = createInsertSchema(tripQuotes).omit({ id: true, createdAt: true });
+export const insertTripSchema = createInsertSchema(trips).omit({ id: true, createdAt: true, updatedAt: true });
+
 export type TransportProvider = typeof transportProviders.$inferSelect;
 export type InsertTransportProvider = z.infer<typeof insertTransportProviderSchema>;
-
-// Trip requests — user logs a trip need / community can see demand
-export const tripRequests = pgTable("trip_requests", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  fromLocation: text("from_location").notNull(),
-  toLocation: text("to_location").notNull(),
-  state: text("state").notNull(),
-  date: text("date").notNull(), // ISO date string
-  needsWheelchairAccess: boolean("needs_wheelchair_access").default(false),
-  needsCompanion: boolean("needs_companion").default(false),
-  isNdisFunded: boolean("is_ndis_funded").default(false),
-  notes: text("notes"),
-  status: text("status").default("pending"), // 'pending' | 'matched' | 'cancelled'
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const tripRequestsRelations = relations(tripRequests, ({ one }) => ({
-  user: one(users, {
-    fields: [tripRequests.userId],
-    references: [users.id],
-  }),
-}));
-
-export const insertTripRequestSchema = createInsertSchema(tripRequests).omit({
-  id: true, userId: true, status: true, createdAt: true,
-});
-export type TripRequest = typeof tripRequests.$inferSelect;
-export type InsertTripRequest = z.infer<typeof insertTripRequestSchema>;
+export type TransportVehicle = typeof transportVehicles.$inferSelect;
+export type InsertTransportVehicle = z.infer<typeof insertTransportVehicleSchema>;
+export type TripQuote = typeof tripQuotes.$inferSelect;
+export type InsertTripQuote = z.infer<typeof insertTripQuoteSchema>;
+export type Trip = typeof trips.$inferSelect;
+export type InsertTrip = z.infer<typeof insertTripSchema>;
 
 // === AI CHAT CONVERSATIONS (for voice features) ===
 export const conversations = pgTable("conversations", {

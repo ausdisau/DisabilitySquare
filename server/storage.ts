@@ -1,10 +1,10 @@
 import { db } from "./db";
-import { eq, desc, and, sql, sum, gte, lte } from "drizzle-orm";
+import { eq, desc, and, sql, sum, gte, lte, lt } from "drizzle-orm";
 import { 
   users, profiles, groups, posts, comments, gameScores, groupMembers,
   badges, userBadges, pointsLedger, userPoints, userReports,
   spoonStatus, journalEntries, serviceProviders, resources, savedResources, jobListings,
-  transportProviders, tripRequests,
+  transportProviders, transportVehicles, tripQuotes, trips,
   type User, type InsertUser,
   type Profile, type InsertProfile,
   type Group, type InsertGroup,
@@ -22,7 +22,9 @@ import {
   type Resource, type InsertResource,
   type JobListing, type InsertJobListing,
   type TransportProvider, type InsertTransportProvider,
-  type TripRequest, type InsertTripRequest,
+  type TransportVehicle, type InsertTransportVehicle,
+  type TripQuote, type InsertTripQuote,
+  type Trip, type InsertTrip,
   POINT_VALUES
 } from "@shared/schema";
 
@@ -98,16 +100,18 @@ export interface IStorage {
   createJobListing(data: InsertJobListing, postedById: string): Promise<JobListing>;
   approveJobListing(id: number): Promise<void>;
 
-  // Transport Providers
-  listTransportProviders(filters?: { type?: string; state?: string; isWheelchairAccessible?: boolean; acceptsCompanionCard?: boolean; isNdisTransportFunded?: boolean; search?: string }): Promise<TransportProvider[]>;
+  // Transport Module
+  seedTransportProviders(): Promise<void>;
+  listTransportProviders(): Promise<TransportProvider[]>;
   getTransportProvider(id: number): Promise<TransportProvider | undefined>;
-  createTransportProvider(data: InsertTransportProvider, submittedById: string): Promise<TransportProvider>;
-  approveTransportProvider(id: number): Promise<void>;
-
-  // Trip Requests
-  createTripRequest(data: InsertTripRequest, userId: string): Promise<TripRequest>;
-  listMyTripRequests(userId: string): Promise<TripRequest[]>;
-  cancelTripRequest(id: number, userId: string): Promise<void>;
+  findNearbyVehicles(filters: { accessNeeds: string[]; capacity: number; originLat?: number; originLng?: number; radiusKm?: number }): Promise<(TransportVehicle & { provider: TransportProvider })[]>;
+  createTripQuote(data: InsertTripQuote): Promise<TripQuote>;
+  getTripQuote(id: number): Promise<TripQuote | undefined>;
+  createTrip(data: InsertTrip): Promise<Trip>;
+  getTrip(id: number): Promise<(Trip & { provider: TransportProvider }) | undefined>;
+  getUserTrips(sessionId?: string, userId?: string): Promise<(Trip & { provider: TransportProvider })[]>;
+  updateTripStatus(id: number, status: string): Promise<Trip>;
+  cancelTrip(id: number): Promise<Trip>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -503,16 +507,86 @@ export class DatabaseStorage implements IStorage {
     await db.update(jobListings).set({ approved: true }).where(eq(jobListings.id, id));
   }
 
-  // === TRANSPORT PROVIDERS ===
-  async listTransportProviders(filters?: { type?: string; state?: string; isWheelchairAccessible?: boolean; acceptsCompanionCard?: boolean; isNdisTransportFunded?: boolean; search?: string }): Promise<TransportProvider[]> {
-    const conditions = [eq(transportProviders.approved, true)];
-    if (filters?.type) conditions.push(eq(transportProviders.type, filters.type));
-    if (filters?.state) conditions.push(eq(transportProviders.state, filters.state));
-    if (filters?.isWheelchairAccessible) conditions.push(eq(transportProviders.isWheelchairAccessible, true));
-    if (filters?.acceptsCompanionCard) conditions.push(eq(transportProviders.acceptsCompanionCard, true));
-    if (filters?.isNdisTransportFunded) conditions.push(eq(transportProviders.isNdisTransportFunded, true));
-    if (filters?.search) conditions.push(sql`${transportProviders.name} ILIKE ${`%${filters.search}%`}`);
-    return await db.select().from(transportProviders).where(and(...conditions)).orderBy(transportProviders.name);
+  // === TRANSPORT MODULE ===
+
+  async seedTransportProviders(): Promise<void> {
+    const existing = await db.select().from(transportProviders).limit(1);
+    if (existing.length > 0) return;
+
+    const [wat] = await db.insert(transportProviders).values({
+      name: "Sydney Accessible Transport Co.",
+      kind: "wat",
+      ndisSupport: true,
+      rateCard: {
+        baseFare: 8.0,
+        perKm: 2.8,
+        perMinute: 0.45,
+        wheelchairSurcharge: 12.0,
+        rampSurcharge: 5.0,
+        driverAssistanceSurcharge: 8.0,
+      },
+      adapterKey: "zoomly_manual",
+      active: true,
+    }).returning();
+
+    const [rideshare] = await db.insert(transportProviders).values({
+      name: "CityRide Partner Network",
+      kind: "rideshare",
+      ndisSupport: false,
+      rateCard: {
+        baseFare: 5.0,
+        perKm: 1.9,
+        perMinute: 0.3,
+        wheelchairSurcharge: 0,
+        rampSurcharge: 0,
+        driverAssistanceSurcharge: 4.0,
+      },
+      adapterKey: "zoomly_manual",
+      active: true,
+    }).returning();
+
+    await db.insert(transportVehicles).values([
+      {
+        providerId: wat.id,
+        vehicleType: "wheelchair_van",
+        capacity: 4,
+        accessibilityFeatures: ["wheelchair", "ramp", "driver_assistance", "low_sensory", "no_stairs"],
+        lat: "-33.8688",
+        lng: "151.2093",
+        available: true,
+      },
+      {
+        providerId: wat.id,
+        vehicleType: "minibus",
+        capacity: 8,
+        accessibilityFeatures: ["wheelchair", "ramp", "no_stairs"],
+        lat: "-33.8750",
+        lng: "151.2050",
+        available: true,
+      },
+      {
+        providerId: rideshare.id,
+        vehicleType: "sedan",
+        capacity: 4,
+        accessibilityFeatures: ["driver_assistance"],
+        lat: "-33.8700",
+        lng: "151.2100",
+        available: true,
+      },
+      {
+        providerId: rideshare.id,
+        vehicleType: "suv",
+        capacity: 5,
+        accessibilityFeatures: ["driver_assistance", "low_sensory"],
+        lat: "-33.8650",
+        lng: "151.2150",
+        available: true,
+      },
+    ]);
+  }
+
+  async listTransportProviders(): Promise<TransportProvider[]> {
+    return await db.select().from(transportProviders).where(eq(transportProviders.active, true));
   }
 
   async getTransportProvider(id: number): Promise<TransportProvider | undefined> {
@@ -520,27 +594,87 @@ export class DatabaseStorage implements IStorage {
     return provider;
   }
 
-  async createTransportProvider(data: InsertTransportProvider, submittedById: string): Promise<TransportProvider> {
-    const [newProvider] = await db.insert(transportProviders).values({ ...data, submittedById, approved: false }).returning();
-    return newProvider;
+  async findNearbyVehicles(filters: { accessNeeds: string[]; capacity: number; originLat?: number; originLng?: number; radiusKm?: number }): Promise<(TransportVehicle & { provider: TransportProvider })[]> {
+    const allVehicles = await db.query.transportVehicles.findMany({
+      where: eq(transportVehicles.available, true),
+      with: {
+        provider: true,
+      },
+    });
+
+    const radiusKm = filters.radiusKm ?? 50;
+
+    function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    return (allVehicles as any[]).filter((v: any) => {
+      if (v.capacity < filters.capacity) return false;
+      if (!v.provider?.active) return false;
+      if (filters.originLat !== undefined && filters.originLng !== undefined && v.lat && v.lng) {
+        const dist = haversineKm(filters.originLat, filters.originLng, parseFloat(v.lat), parseFloat(v.lng));
+        if (dist > radiusKm) return false;
+      }
+      if (filters.accessNeeds.length === 0) return true;
+      const features = v.accessibilityFeatures as string[];
+      return filters.accessNeeds.every(need => features.includes(need));
+    });
   }
 
-  async approveTransportProvider(id: number): Promise<void> {
-    await db.update(transportProviders).set({ approved: true }).where(eq(transportProviders.id, id));
+  async createTripQuote(data: InsertTripQuote): Promise<TripQuote> {
+    const [quote] = await db.insert(tripQuotes).values(data).returning();
+    return quote;
   }
 
-  // === TRIP REQUESTS ===
-  async createTripRequest(data: InsertTripRequest, userId: string): Promise<TripRequest> {
-    const [request] = await db.insert(tripRequests).values({ ...data, userId, status: "pending" }).returning();
-    return request;
+  async getTripQuote(id: number): Promise<TripQuote | undefined> {
+    const [quote] = await db.select().from(tripQuotes).where(eq(tripQuotes.id, id));
+    return quote;
   }
 
-  async listMyTripRequests(userId: string): Promise<TripRequest[]> {
-    return await db.select().from(tripRequests).where(eq(tripRequests.userId, userId)).orderBy(desc(tripRequests.createdAt));
+  async createTrip(data: InsertTrip): Promise<Trip> {
+    const [trip] = await db.insert(trips).values(data).returning();
+    return trip;
   }
 
-  async cancelTripRequest(id: number, userId: string): Promise<void> {
-    await db.update(tripRequests).set({ status: "cancelled" }).where(and(eq(tripRequests.id, id), eq(tripRequests.userId, userId)));
+  async getTrip(id: number): Promise<(Trip & { provider: TransportProvider }) | undefined> {
+    const trip = await db.query.trips.findFirst({
+      where: eq(trips.id, id),
+      with: { provider: true },
+    });
+    return trip as any;
+  }
+
+  async getUserTrips(sessionId?: string, userId?: string): Promise<(Trip & { provider: TransportProvider })[]> {
+    const userTrips = await db.query.trips.findMany({
+      where: userId
+        ? eq(trips.userId, userId)
+        : sessionId
+          ? eq(trips.sessionId, sessionId)
+          : undefined,
+      with: { provider: true },
+      orderBy: [desc(trips.createdAt)],
+    });
+    return userTrips as any;
+  }
+
+  async updateTripStatus(id: number, status: string): Promise<Trip> {
+    const [updated] = await db.update(trips)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(trips.id, id))
+      .returning();
+    return updated;
+  }
+
+  async cancelTrip(id: number): Promise<Trip> {
+    const [updated] = await db.update(trips)
+      .set({ status: "cancelled", updatedAt: new Date() })
+      .where(eq(trips.id, id))
+      .returning();
+    return updated;
   }
 }
 

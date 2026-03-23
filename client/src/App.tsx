@@ -83,7 +83,7 @@ function Router() {
       <Route path="/providers" component={props => <PrivateRoute component={ServiceDirectory} {...props} />} />
       <Route path="/resources" component={props => <PrivateRoute component={Resources} {...props} />} />
       <Route path="/jobs" component={props => <PrivateRoute component={JobBoard} {...props} />} />
-      <Route path="/transport" component={props => <PrivateRoute component={Transport} {...props} />} />
+      <Route path="/transport" component={Transport} />
       <Route component={NotFound} />
     </Switch>
   );

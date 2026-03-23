@@ -172,14 +172,44 @@ Five key features added to differentiate DisabilitySquare:
 - Shows accessible workplace and disability-welcome badges
 - Click-through to apply online or via email
 
-### 6. Accessible Transport (`/transport`)
-- Directory of 10 seeded Australian accessible transport providers
-- Filter by type (public transport, taxi, rideshare, community, NDIS), state, wheelchair accessibility, Companion Card, NDIS funding
-- Search by provider name
-- Expandable provider cards with features, phone, website
-- Trip request form (authenticated users can log transport needs with date, accessibility requirements)
-- My Trip Requests tab — view and cancel pending trip requests
-- NDIS Transport Info tab — guides on NDIS transport funding, Companion Card, taxi subsidy schemes by state
+## Transport Module (`/transport`)
+
+Accessible transport search and booking feature:
+
+### Features
+- **Public/Guest access**: No login required; session tracked via `sessionStorage`
+- **Multi-step booking flow**: Search → Quote Results → Confirmation
+- **My Trips tab**: View and cancel active/past trips
+- **Accessibility need filters**: wheelchair, ramp, driver assistance, low sensory, no stairs
+- **NDIS eligibility badges**: Shown per provider
+- **Price calculation**: Uses Google Maps Directions API (falls back to haversine estimate if key not configured)
+
+### API Endpoints
+- `POST /api/transport/quote` — Get transport quotes for a trip
+- `POST /api/transport/trips` — Book a trip from a quote
+- `GET /api/transport/trips/:id` — Get a specific trip
+- `GET /api/transport/trips?sessionId=...` — List trips for session/user
+- `POST /api/transport/trips/:id/cancel` — Cancel a pending booking
+- `POST /api/transport/seed-demo` — Seed demo transport data
+
+### Adapter Pattern
+Located in `server/transport/adapters/`:
+- **ZoomlyManualAdapter** (`zoomly_manual`): Default, returns pending status with reference
+- **UberGuestRidesAdapter** (`uber_guest`): Stub, activates only when `UBER_CLIENT_ID` + `UBER_CLIENT_SECRET` are set
+
+### Database Tables
+- `transport_providers`: Provider name, kind, NDIS support, rate card, adapter key
+- `transport_vehicles`: Vehicle type, capacity, accessibility features, lat/lng
+- `trip_quotes`: Quote with options, pricing, expiry
+- `trips`: Booked trip with status, external ref, price
+
+### Demo Seed
+Two providers auto-seeded on server startup near Sydney CBD:
+1. **Sydney Accessible Transport Co.** (WAT, NDIS eligible)
+2. **CityRide Partner Network** (rideshare, standard)
+
+### Google Maps Configuration
+Set `GOOGLE_MAPS_API_KEY` environment variable to enable real routing. Falls back to haversine distance estimation.
 
 ## Recent Changes
 
@@ -200,6 +230,5 @@ Five key features added to differentiate DisabilitySquare:
 - ExtensionContext now uses storage methods for consistent valorization behavior
 - Added 5 competitive features: Spoon Tracker, Health Journal, Service Directory, Resource Library, Job Board
 - Seeded 10 service providers, 10 resources, 6 job listings (all approved)
-- Added Transport module: accessible transport directory, trip requests, NDIS info
-- Seeded 10 Australian accessible transport providers (all approved)
+- Added Transport Search & Booking Module with adapter pattern, NDIS support, public access
 - Redesigned UI to 2004-era social network aesthetic: fixed-width boxy layout, colored section headers, flat post cards, top nav bar, chronological feed with right sidebar (community stats, top members, groups)

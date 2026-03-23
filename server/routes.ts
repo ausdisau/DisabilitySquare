@@ -732,65 +732,284 @@ export async function registerRoutes(
   });
 
   // === TRANSPORT MODULE ===
-  app.get('/api/transport', async (req: any, res) => {
+
+  // Seed demo transport data (dev/public endpoint)
+  app.post("/api/transport/seed-demo", async (req, res) => {
     try {
-      const { type, state, wheelchair, companion, ndis, search } = req.query;
-      const providers = await storage.listTransportProviders({
-        type: type as string | undefined,
-        state: state as string | undefined,
-        isWheelchairAccessible: wheelchair === 'true' ? true : undefined,
-        acceptsCompanionCard: companion === 'true' ? true : undefined,
-        isNdisTransportFunded: ndis === 'true' ? true : undefined,
-        search: search as string | undefined,
+      await storage.seedTransportProviders();
+      res.json({ success: true, message: "Transport demo data seeded" });
+    } catch (error) {
+      console.error("[transport] Seed error:", error);
+      res.status(500).json({ message: "Failed to seed transport data" });
+    }
+  });
+
+  // Get a quote for a trip
+  app.post("/api/transport/quote", async (req: any, res) => {
+    try {
+      const schema = z.object({
+        pickupAddress: z.string().min(3),
+        pickupLat: z.string(),
+        pickupLng: z.string(),
+        dropoffAddress: z.string().min(3),
+        dropoffLat: z.string(),
+        dropoffLng: z.string(),
+        accessNeeds: z.array(z.enum(["wheelchair", "ramp", "driver_assistance", "low_sensory", "no_stairs"])).default([]),
+        companionCount: z.number().int().min(0).max(6).default(0),
+        fundingType: z.enum(["ndis", "private", "transport_allowance"]).default("private"),
+        sessionId: z.string().optional(),
       });
-      res.json(providers);
-    } catch {
-      res.status(500).json({ message: 'Internal server error' });
-    }
-  });
+      const input = schema.parse(req.body);
+      const userId = req.userId || req.oidc?.user?.sub || null;
 
-  app.post('/api/transport', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.oidc?.user?.sub || req.userId;
-      const { insertTransportProviderSchema } = await import('@shared/schema');
-      const input = insertTransportProviderSchema.parse(req.body);
-      const provider = await storage.createTransportProvider(input, userId);
-      res.status(201).json(provider);
+      const { getDirections, calculatePrice } = await import("./transport/maps");
+      const { distanceKm, durationMinutes } = await getDirections(
+        input.pickupLat, input.pickupLng, input.dropoffLat, input.dropoffLng
+      );
+
+      const totalPassengers = 1 + input.companionCount;
+      const originLat = parseFloat(input.pickupLat);
+      const originLng = parseFloat(input.pickupLng);
+      const vehicles = await storage.findNearbyVehicles({
+        accessNeeds: input.accessNeeds,
+        capacity: totalPassengers,
+        originLat: isNaN(originLat) ? undefined : originLat,
+        originLng: isNaN(originLng) ? undefined : originLng,
+        radiusKm: 100,
+      });
+
+      if (vehicles.length === 0) {
+        await storage.seedTransportProviders();
+        const seededVehicles = await storage.findNearbyVehicles({
+          accessNeeds: [],
+          capacity: totalPassengers,
+          originLat: isNaN(originLat) ? undefined : originLat,
+          originLng: isNaN(originLng) ? undefined : originLng,
+          radiusKm: 100,
+        });
+        if (seededVehicles.length === 0) {
+          return res.status(404).json({ message: "No vehicles available for your requirements" });
+        }
+      }
+
+      const availableVehicles = vehicles.length > 0 ? vehicles : await storage.findNearbyVehicles({
+        accessNeeds: [],
+        capacity: totalPassengers,
+        originLat: isNaN(originLat) ? undefined : originLat,
+        originLng: isNaN(originLng) ? undefined : originLng,
+        radiusKm: 100,
+      });
+
+      const seenProviders = new Set<number>();
+      const options = [];
+      for (const vehicle of availableVehicles) {
+        if (seenProviders.has(vehicle.providerId)) continue;
+        seenProviders.add(vehicle.providerId);
+        const provider = vehicle.provider;
+        const rateCard = provider.rateCard as any;
+        const price = calculatePrice(distanceKm, durationMinutes, rateCard, input.accessNeeds);
+        const etaMinutes = 8 + Math.floor(Math.random() * 12);
+        options.push({
+          providerId: provider.id,
+          providerName: provider.name,
+          vehicleType: vehicle.vehicleType,
+          etaMinutes,
+          priceAud: price,
+          ndisEligible: provider.ndisSupport,
+          vehicleId: vehicle.id,
+        });
+      }
+
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      const quote = await storage.createTripQuote({
+        sessionId: input.sessionId || null,
+        userId,
+        pickupAddress: input.pickupAddress,
+        pickupLat: input.pickupLat,
+        pickupLng: input.pickupLng,
+        dropoffAddress: input.dropoffAddress,
+        dropoffLat: input.dropoffLat,
+        dropoffLng: input.dropoffLng,
+        accessNeeds: input.accessNeeds,
+        companionCount: input.companionCount,
+        fundingType: input.fundingType,
+        distanceKm: distanceKm.toFixed(2),
+        durationMinutes,
+        options,
+        expiresAt,
+      });
+
+      res.json({
+        quoteId: quote.id,
+        distanceKm: parseFloat(distanceKm.toFixed(2)),
+        durationMinutes,
+        options,
+        expiresAt,
+      });
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
-      res.status(500).json({ message: 'Internal server error' });
+      console.error("[transport] Quote error:", error);
+      res.status(500).json({ message: "Failed to generate quote" });
     }
   });
 
-  app.post('/api/transport/:id/approve', isAuthenticated, isAdmin, async (req: any, res) => {
-    await storage.approveTransportProvider(Number(req.params.id));
-    res.json({ success: true });
-  });
-
-  // Trip Requests
-  app.get('/api/transport/my-trips', isAuthenticated, async (req: any, res) => {
-    const userId = req.oidc?.user?.sub || req.userId;
-    const trips = await storage.listMyTripRequests(userId);
-    res.json(trips);
-  });
-
-  app.post('/api/transport/trips', isAuthenticated, async (req: any, res) => {
+  // Book a trip from a quote
+  app.post("/api/transport/trips", async (req: any, res) => {
     try {
-      const userId = req.oidc?.user?.sub || req.userId;
-      const { insertTripRequestSchema } = await import('@shared/schema');
-      const input = insertTripRequestSchema.parse(req.body);
-      const trip = await storage.createTripRequest(input, userId);
-      res.status(201).json(trip);
+      const schema = z.object({
+        quoteId: z.number().int(),
+        selectedOptionIndex: z.number().int().min(0),
+        sessionId: z.string().optional(),
+      });
+      const input = schema.parse(req.body);
+      const userId = req.userId || req.oidc?.user?.sub || null;
+
+      const quote = await storage.getTripQuote(input.quoteId);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      if (new Date() > quote.expiresAt) {
+        return res.status(400).json({ message: "Quote has expired. Please get a new quote." });
+      }
+
+      const options = quote.options as any[];
+      if (!options || input.selectedOptionIndex >= options.length) {
+        return res.status(400).json({ message: "Invalid option selected" });
+      }
+
+      const selectedOption = options[input.selectedOptionIndex];
+      const provider = await storage.getTransportProvider(selectedOption.providerId);
+      if (!provider) return res.status(404).json({ message: "Provider not found" });
+
+      const trip = await storage.createTrip({
+        quoteId: quote.id,
+        providerId: selectedOption.providerId,
+        vehicleId: selectedOption.vehicleId,
+        sessionId: input.sessionId || quote.sessionId || null,
+        userId,
+        pickupAddress: quote.pickupAddress,
+        dropoffAddress: quote.dropoffAddress,
+        priceAud: selectedOption.priceAud.toFixed(2),
+        status: "pending",
+        accessNeeds: quote.accessNeeds as string[],
+        fundingType: quote.fundingType,
+        externalRef: null,
+      });
+
+      const { getAdapter } = await import("./transport/adapters/registry");
+      const adapter = getAdapter(provider.adapterKey);
+      const booking = await adapter.book({
+        tripId: trip.id,
+        pickupAddress: quote.pickupAddress,
+        pickupLat: quote.pickupLat,
+        pickupLng: quote.pickupLng,
+        dropoffAddress: quote.dropoffAddress,
+        dropoffLat: quote.dropoffLat,
+        dropoffLng: quote.dropoffLng,
+        vehicleId: selectedOption.vehicleId,
+        vehicleType: selectedOption.vehicleType,
+        accessNeeds: quote.accessNeeds as string[],
+        priceAud: selectedOption.priceAud,
+        sessionId: trip.sessionId || undefined,
+        userId: userId || undefined,
+      });
+
+      const updatedTrip = await storage.updateTripStatus(trip.id, booking.status);
+      const [finalTrip] = await Promise.all([
+        storage.getTrip(trip.id),
+      ]);
+
+      await storage.updateTripStatus(trip.id, booking.status);
+
+      const tripWithRef = await storage.getTrip(trip.id);
+      if (tripWithRef) {
+        await import("./db").then(async ({ db }) => {
+          const { trips: tripsTable } = await import("@shared/schema");
+          const { eq } = await import("drizzle-orm");
+          await db.update(tripsTable).set({ externalRef: booking.externalRef }).where(eq(tripsTable.id, trip.id));
+        });
+      }
+
+      res.status(201).json({
+        tripId: trip.id,
+        referenceNumber: booking.externalRef,
+        status: booking.status,
+        message: booking.message,
+        pickupAddress: quote.pickupAddress,
+        dropoffAddress: quote.dropoffAddress,
+        priceAud: selectedOption.priceAud,
+        providerName: selectedOption.providerName,
+        vehicleType: selectedOption.vehicleType,
+        etaMinutes: selectedOption.etaMinutes,
+      });
     } catch (error) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: error.errors[0].message });
-      res.status(500).json({ message: 'Internal server error' });
+      console.error("[transport] Booking error:", error);
+      res.status(500).json({ message: "Failed to create booking" });
     }
   });
 
-  app.patch('/api/transport/trips/:id/cancel', isAuthenticated, async (req: any, res) => {
-    const userId = req.oidc?.user?.sub || req.userId;
-    await storage.cancelTripRequest(Number(req.params.id), userId);
-    res.json({ success: true });
+  // Get a specific trip (ownership enforced)
+  app.get("/api/transport/trips/:id", async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const userId = req.userId || req.oidc?.user?.sub || null;
+      const sessionId = req.query.sessionId as string | undefined;
+      const trip = await storage.getTrip(id);
+      if (!trip) return res.status(404).json({ message: "Trip not found" });
+      const ownerMatch = (userId && trip.userId === userId) || (sessionId && trip.sessionId === sessionId);
+      if (!ownerMatch) return res.status(403).json({ message: "Access denied" });
+      res.json(trip);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // List trips for current session/user
+  app.get("/api/transport/trips", async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub || null;
+      const sessionId = req.query.sessionId as string | undefined;
+      if (!userId && !sessionId) return res.json([]);
+      const tripsList = await storage.getUserTrips(sessionId, userId);
+      res.json(tripsList);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Cancel a trip (ownership enforced)
+  app.post("/api/transport/trips/:id/cancel", async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const userId = req.userId || req.oidc?.user?.sub || null;
+      const sessionId = (req.body?.sessionId || req.query.sessionId) as string | undefined;
+      const trip = await storage.getTrip(id);
+      if (!trip) return res.status(404).json({ message: "Trip not found" });
+
+      const ownerMatch = (userId && trip.userId === userId) || (sessionId && trip.sessionId === sessionId);
+      if (!ownerMatch) return res.status(403).json({ message: "Access denied" });
+
+      if (trip.status !== "pending" && trip.status !== "confirmed") {
+        return res.status(400).json({ message: `Cannot cancel a trip with status: ${trip.status}` });
+      }
+
+      const provider = trip.provider;
+      if (provider && trip.externalRef) {
+        try {
+          const { getAdapter } = await import("./transport/adapters/registry");
+          const adapter = getAdapter(provider.adapterKey);
+          await adapter.cancel(trip.externalRef);
+        } catch (err) {
+          console.warn("[transport] Adapter cancel failed, proceeding anyway:", err);
+        }
+      }
+
+      const cancelled = await storage.cancelTrip(id);
+      res.json(cancelled);
+    } catch (error) {
+      console.error("[transport] Cancel error:", error);
+      res.status(500).json({ message: "Failed to cancel trip" });
+    }
   });
 
   // === VOICE TRANSCRIPTION (Accessibility Feature) ===

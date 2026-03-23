@@ -1,709 +1,686 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/use-auth";
-import { useToast } from "@/hooks/use-toast";
+import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SEO } from "@/components/SEO";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import {
-  Bus,
-  Car,
-  Phone,
-  Globe,
-  Search,
-  Plus,
-  MapPin,
-  CheckCircle,
-  Wheelchair,
-  Clock,
-  CalendarDays,
-  XCircle,
-  Info,
-  ChevronDown,
-  ChevronUp,
+  Bus, MapPin, Clock, DollarSign, CheckCircle2, XCircle,
+  ArrowRight, User, Users, Loader2, ChevronLeft, Star
 } from "lucide-react";
-import type { TransportProvider, TripRequest } from "@shared/schema";
 
-const STATES = ["National", "NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"];
+const ACCESS_NEEDS = [
+  { id: "wheelchair", label: "Wheelchair accessible" },
+  { id: "ramp", label: "Ramp required" },
+  { id: "driver_assistance", label: "Driver assistance" },
+  { id: "low_sensory", label: "Low sensory environment" },
+  { id: "no_stairs", label: "No stairs" },
+];
 
-const TRANSPORT_TYPES: Record<string, { label: string; color: string }> = {
-  public_transport: { label: "Public Transport", color: "bg-blue-100 text-blue-800" },
-  taxi: { label: "Taxi / Hire Car", color: "bg-yellow-100 text-yellow-800" },
-  rideshare: { label: "Rideshare", color: "bg-purple-100 text-purple-800" },
-  community_transport: { label: "Community Transport", color: "bg-green-100 text-green-800" },
-  ndis_transport: { label: "NDIS Transport", color: "bg-orange-100 text-orange-800" },
+const FUNDING_TYPES = [
+  { value: "private", label: "Private (self-funded)" },
+  { value: "ndis", label: "NDIS funding" },
+  { value: "transport_allowance", label: "Transport allowance" },
+];
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  confirmed: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  in_progress: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  completed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  cancelled: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
 };
 
-const FEATURE_LABELS: Record<string, string> = {
-  ramp: "Ramp",
-  hoist: "Hoist / Lift",
-  trained_driver: "Trained Driver",
-  door_to_door: "Door-to-Door",
-  advance_booking: "Advance Booking",
-  companion_seat: "Companion Seat",
-  oxygen_friendly: "Oxygen-Friendly Vehicle",
-  assistance_dogs: "Assistance Dogs Welcome",
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  in_progress: "In Progress",
+  completed: "Completed",
+  cancelled: "Cancelled",
 };
 
-const submitProviderSchema = z.object({
-  name: z.string().min(2, "Name is required"),
-  description: z.string().min(10, "Please write a short description"),
-  type: z.string().min(1, "Please select a type"),
-  state: z.string().min(1, "Please select a state"),
-  phone: z.string().optional(),
-  website: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
-  email: z.string().email("Please enter a valid email").optional().or(z.literal("")),
-  isNdisRegistered: z.boolean().default(false),
-  isWheelchairAccessible: z.boolean().default(false),
-  acceptsCompanionCard: z.boolean().default(false),
-  isNdisTransportFunded: z.boolean().default(false),
-  features: z.array(z.string()).default([]),
-});
+const VEHICLE_LABELS: Record<string, string> = {
+  wheelchair_van: "Wheelchair Van",
+  sedan: "Sedan",
+  suv: "SUV",
+  minibus: "Minibus",
+};
 
-const tripRequestSchema = z.object({
-  fromLocation: z.string().min(2, "From location is required"),
-  toLocation: z.string().min(2, "To location is required"),
-  state: z.string().min(1, "Please select a state"),
-  date: z.string().min(1, "Date is required"),
-  needsWheelchairAccess: z.boolean().default(false),
-  needsCompanion: z.boolean().default(false),
-  isNdisFunded: z.boolean().default(false),
-  notes: z.string().optional(),
-});
-
-function ProviderCard({ provider }: { provider: TransportProvider }) {
-  const [expanded, setExpanded] = useState(false);
-  const typeInfo = TRANSPORT_TYPES[provider.type] || { label: provider.type, color: "bg-gray-100 text-gray-800" };
-
-  return (
-    <Card className="hover:shadow-md transition-shadow" data-testid={`card-transport-${provider.id}`}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <h3 className="font-semibold text-[#1B4B8A] text-base" data-testid={`text-provider-name-${provider.id}`}>
-                {provider.name}
-              </h3>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeInfo.color}`}>
-                {typeInfo.label}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1 text-sm text-gray-500 mb-2">
-              <MapPin className="w-3 h-3 shrink-0" />
-              <span>{provider.state}</span>
-            </div>
-
-            <p className="text-sm text-gray-700 line-clamp-2">{provider.description}</p>
-
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {provider.isWheelchairAccessible && (
-                <Badge variant="secondary" className="text-xs bg-teal-50 text-teal-700 border-teal-200">
-                  ♿ Wheelchair Accessible
-                </Badge>
-              )}
-              {provider.acceptsCompanionCard && (
-                <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                  Companion Card
-                </Badge>
-              )}
-              {provider.isNdisRegistered && (
-                <Badge variant="secondary" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
-                  NDIS Registered
-                </Badge>
-              )}
-              {provider.isNdisTransportFunded && (
-                <Badge variant="secondary" className="text-xs bg-green-50 text-green-700 border-green-200">
-                  NDIS Transport Funded
-                </Badge>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {expanded && (
-          <div className="mt-3 pt-3 border-t space-y-2">
-            {(provider.features ?? []).length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-gray-500 mb-1">Features</p>
-                <div className="flex flex-wrap gap-1">
-                  {(provider.features ?? []).map(f => (
-                    <span key={f} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
-                      {FEATURE_LABELS[f] ?? f}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="flex flex-wrap gap-3 text-sm">
-              {provider.phone && (
-                <a href={`tel:${provider.phone}`} className="flex items-center gap-1 text-[#1B4B8A] hover:underline" data-testid={`link-phone-${provider.id}`}>
-                  <Phone className="w-3.5 h-3.5" /> {provider.phone}
-                </a>
-              )}
-              {provider.website && (
-                <a href={provider.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[#1B4B8A] hover:underline" data-testid={`link-website-${provider.id}`}>
-                  <Globe className="w-3.5 h-3.5" /> Website
-                </a>
-              )}
-              {provider.email && (
-                <a href={`mailto:${provider.email}`} className="flex items-center gap-1 text-[#1B4B8A] hover:underline">
-                  Email
-                </a>
-              )}
-            </div>
-          </div>
-        )}
-
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mt-2 w-full text-xs text-gray-500 hover:text-[#1B4B8A]"
-          onClick={() => setExpanded(!expanded)}
-          data-testid={`button-expand-${provider.id}`}
-          aria-expanded={expanded}
-        >
-          {expanded ? <><ChevronUp className="w-3 h-3 mr-1" /> Less</> : <><ChevronDown className="w-3 h-3 mr-1" /> More details</>}
-        </Button>
-      </CardContent>
-    </Card>
-  );
+function getSessionId(): string {
+  let id = sessionStorage.getItem("transport_session_id");
+  if (!id) {
+    id = `guest-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    sessionStorage.setItem("transport_session_id", id);
+  }
+  return id;
 }
 
-function SubmitProviderDialog() {
-  const [open, setOpen] = useState(false);
-  const { toast } = useToast();
-
-  const form = useForm<z.infer<typeof submitProviderSchema>>({
-    resolver: zodResolver(submitProviderSchema),
-    defaultValues: {
-      name: "", description: "", type: "", state: "",
-      phone: "", website: "", email: "",
-      isNdisRegistered: false, isWheelchairAccessible: false,
-      acceptsCompanionCard: false, isNdisTransportFunded: false,
-      features: [],
-    },
-  });
-
-  const mutation = useMutation({
-    mutationFn: (data: z.infer<typeof submitProviderSchema>) =>
-      apiRequest("POST", "/api/transport", data),
-    onSuccess: () => {
-      toast({ title: "Provider submitted", description: "It will appear once reviewed by our team." });
-      form.reset();
-      setOpen(false);
-    },
-    onError: () => toast({ title: "Error", description: "Could not submit provider.", variant: "destructive" }),
-  });
-
-  const allFeatures = Object.keys(FEATURE_LABELS);
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-[#E07830] hover:bg-[#c96a28] text-white" data-testid="button-submit-provider">
-          <Plus className="w-4 h-4 mr-1" /> Submit Provider
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Submit a Transport Provider</DialogTitle>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(d => mutation.mutate(d))} className="space-y-3">
-            <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem><FormLabel>Provider Name</FormLabel>
-                <FormControl><Input {...field} data-testid="input-provider-name" /></FormControl>
-                <FormMessage /></FormItem>
-            )} />
-            <div className="grid grid-cols-2 gap-3">
-              <FormField control={form.control} name="type" render={({ field }) => (
-                <FormItem><FormLabel>Type</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl><SelectTrigger data-testid="select-provider-type"><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {Object.entries(TRANSPORT_TYPES).map(([v, { label }]) => (
-                        <SelectItem key={v} value={v}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="state" render={({ field }) => (
-                <FormItem><FormLabel>State</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl><SelectTrigger data-testid="select-provider-state"><SelectValue placeholder="Select state" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage /></FormItem>
-              )} />
-            </div>
-            <FormField control={form.control} name="description" render={({ field }) => (
-              <FormItem><FormLabel>Description</FormLabel>
-                <FormControl><Textarea {...field} rows={3} data-testid="textarea-provider-description" /></FormControl>
-                <FormMessage /></FormItem>
-            )} />
-            <div className="grid grid-cols-2 gap-3">
-              <FormField control={form.control} name="phone" render={({ field }) => (
-                <FormItem><FormLabel>Phone (optional)</FormLabel>
-                  <FormControl><Input {...field} data-testid="input-provider-phone" /></FormControl>
-                  <FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="website" render={({ field }) => (
-                <FormItem><FormLabel>Website (optional)</FormLabel>
-                  <FormControl><Input {...field} placeholder="https://" data-testid="input-provider-website" /></FormControl>
-                  <FormMessage /></FormItem>
-              )} />
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Accessibility</p>
-              {[
-                { name: "isWheelchairAccessible" as const, label: "Wheelchair accessible vehicles" },
-                { name: "acceptsCompanionCard" as const, label: "Accepts Companion Card" },
-                { name: "isNdisRegistered" as const, label: "NDIS registered provider" },
-                { name: "isNdisTransportFunded" as const, label: "Can use NDIS transport funding" },
-              ].map(({ name, label }) => (
-                <FormField key={name} control={form.control} name={name} render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 space-y-0">
-                    <FormControl>
-                      <Checkbox checked={field.value as boolean} onCheckedChange={field.onChange}
-                        data-testid={`checkbox-${name}`} />
-                    </FormControl>
-                    <FormLabel className="font-normal cursor-pointer">{label}</FormLabel>
-                  </FormItem>
-                )} />
-              ))}
-            </div>
-            <div>
-              <p className="text-sm font-medium mb-2">Features</p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {allFeatures.map(f => {
-                  const checked = form.watch("features").includes(f);
-                  return (
-                    <label key={f} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <Checkbox checked={checked} onCheckedChange={c => {
-                        const cur = form.getValues("features");
-                        form.setValue("features", c ? [...cur, f] : cur.filter(x => x !== f));
-                      }} />
-                      {FEATURE_LABELS[f]}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-            <Button type="submit" disabled={mutation.isPending} className="w-full bg-[#1B4B8A] hover:bg-[#163d75] text-white" data-testid="button-submit-provider-form">
-              {mutation.isPending ? "Submitting..." : "Submit for Review"}
-            </Button>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
+async function geocodeAddress(address: string): Promise<{ lat: string; lng: string } | null> {
+  try {
+    const query = encodeURIComponent(address + ", Australia");
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1&countrycodes=au`;
+    const res = await fetch(url, { headers: { "Accept-Language": "en" } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || data.length === 0) return null;
+    return { lat: data[0].lat, lng: data[0].lon };
+  } catch {
+    return null;
+  }
 }
 
-function TripRequestForm() {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [open, setOpen] = useState(false);
-
-  const form = useForm<z.infer<typeof tripRequestSchema>>({
-    resolver: zodResolver(tripRequestSchema),
-    defaultValues: {
-      fromLocation: "", toLocation: "", state: "",
-      date: new Date().toISOString().split("T")[0],
-      needsWheelchairAccess: false, needsCompanion: false, isNdisFunded: false, notes: "",
-    },
-  });
-
-  const mutation = useMutation({
-    mutationFn: (data: z.infer<typeof tripRequestSchema>) =>
-      apiRequest("POST", "/api/transport/trips", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transport/my-trips"] });
-      toast({ title: "Trip request logged", description: "We'll match you with accessible providers in your area." });
-      form.reset();
-      setOpen(false);
-    },
-    onError: () => toast({ title: "Error", description: "Could not log trip request.", variant: "destructive" }),
-  });
-
-  if (!user) return null;
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" className="border-[#1B4B8A] text-[#1B4B8A] hover:bg-[#1B4B8A] hover:text-white" data-testid="button-request-trip">
-          <CalendarDays className="w-4 h-4 mr-1" /> Log a Trip Need
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Log a Transport Need</DialogTitle>
-          <p className="text-sm text-gray-500">We'll match you with accessible providers in your area.</p>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(d => mutation.mutate(d))} className="space-y-3">
-            <FormField control={form.control} name="fromLocation" render={({ field }) => (
-              <FormItem><FormLabel>From</FormLabel>
-                <FormControl><Input {...field} placeholder="Suburb or address" data-testid="input-from-location" /></FormControl>
-                <FormMessage /></FormItem>
-            )} />
-            <FormField control={form.control} name="toLocation" render={({ field }) => (
-              <FormItem><FormLabel>To</FormLabel>
-                <FormControl><Input {...field} placeholder="Suburb or address" data-testid="input-to-location" /></FormControl>
-                <FormMessage /></FormItem>
-            )} />
-            <div className="grid grid-cols-2 gap-3">
-              <FormField control={form.control} name="state" render={({ field }) => (
-                <FormItem><FormLabel>State</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl><SelectTrigger data-testid="select-trip-state"><SelectValue placeholder="State" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {STATES.filter(s => s !== "National").map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="date" render={({ field }) => (
-                <FormItem><FormLabel>Date</FormLabel>
-                  <FormControl><Input type="date" {...field} data-testid="input-trip-date" /></FormControl>
-                  <FormMessage /></FormItem>
-              )} />
-            </div>
-            <div className="space-y-2">
-              {[
-                { name: "needsWheelchairAccess" as const, label: "Need wheelchair-accessible vehicle" },
-                { name: "needsCompanion" as const, label: "Travelling with a companion" },
-                { name: "isNdisFunded" as const, label: "Using NDIS transport funding" },
-              ].map(({ name, label }) => (
-                <FormField key={name} control={form.control} name={name} render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 space-y-0">
-                    <FormControl><Checkbox checked={field.value as boolean} onCheckedChange={field.onChange} data-testid={`checkbox-${name}`} /></FormControl>
-                    <FormLabel className="font-normal cursor-pointer">{label}</FormLabel>
-                  </FormItem>
-                )} />
-              ))}
-            </div>
-            <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem><FormLabel>Notes (optional)</FormLabel>
-                <FormControl><Textarea {...field} rows={2} placeholder="Any special requirements..." data-testid="textarea-trip-notes" /></FormControl>
-                <FormMessage /></FormItem>
-            )} />
-            <Button type="submit" disabled={mutation.isPending} className="w-full bg-[#1B4B8A] hover:bg-[#163d75] text-white" data-testid="button-submit-trip">
-              {mutation.isPending ? "Saving..." : "Log Trip Need"}
-            </Button>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
+interface QuoteOption {
+  providerId: number;
+  providerName: string;
+  vehicleType: string;
+  etaMinutes: number;
+  priceAud: number;
+  ndisEligible: boolean;
+  vehicleId: number;
 }
 
-function MyTrips() {
-  const { data: trips = [], isLoading } = useQuery<TripRequest[]>({
-    queryKey: ["/api/transport/my-trips"],
-  });
+interface QuoteResult {
+  quoteId: number;
+  distanceKm: number;
+  durationMinutes: number;
+  options: QuoteOption[];
+  expiresAt: string;
+}
 
-  const cancelMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("PATCH", `/api/transport/trips/${id}/cancel`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/transport/my-trips"] }),
-  });
+interface BookingResult {
+  tripId: number;
+  referenceNumber: string;
+  status: string;
+  message?: string;
+  pickupAddress: string;
+  dropoffAddress: string;
+  priceAud: number;
+  providerName: string;
+  vehicleType: string;
+  etaMinutes: number;
+}
 
-  const statusColors: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800",
-    matched: "bg-green-100 text-green-800",
-    cancelled: "bg-gray-100 text-gray-600",
-  };
-
-  if (isLoading) return <p className="text-sm text-gray-500">Loading...</p>;
-  if (trips.length === 0) return <p className="text-sm text-gray-500 text-center py-8">No trip requests yet. Use "Log a Trip Need" to get started.</p>;
-
-  return (
-    <div className="space-y-3">
-      {trips.map(trip => (
-        <Card key={trip.id} data-testid={`card-trip-${trip.id}`}>
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium text-sm">{trip.fromLocation} → {trip.toLocation}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[trip.status ?? "pending"]}`}>
-                    {trip.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 text-xs text-gray-500">
-                  <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3" />{trip.date}</span>
-                  <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{trip.state}</span>
-                </div>
-                <div className="flex gap-1.5 mt-1.5">
-                  {trip.needsWheelchairAccess && <Badge variant="secondary" className="text-xs">♿ Wheelchair</Badge>}
-                  {trip.needsCompanion && <Badge variant="secondary" className="text-xs">+Companion</Badge>}
-                  {trip.isNdisFunded && <Badge variant="secondary" className="text-xs">NDIS Funded</Badge>}
-                </div>
-              </div>
-              {trip.status === "pending" && (
-                <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700"
-                  onClick={() => cancelMutation.mutate(trip.id)}
-                  disabled={cancelMutation.isPending}
-                  data-testid={`button-cancel-trip-${trip.id}`}
-                  aria-label="Cancel trip request">
-                  <XCircle className="w-4 h-4" />
-                </Button>
-              )}
-            </div>
-            {trip.notes && <p className="text-xs text-gray-500 mt-2 italic">{trip.notes}</p>}
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
+interface Trip {
+  id: number;
+  pickupAddress: string;
+  dropoffAddress: string;
+  status: string;
+  priceAud: string;
+  externalRef?: string;
+  createdAt: string;
+  provider: { name: string; kind: string };
 }
 
 export default function Transport() {
-  const { user } = useAuth();
-  const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState("");
-  const [filterState, setFilterState] = useState("");
-  const [filterWheelchair, setFilterWheelchair] = useState(false);
-  const [filterCompanion, setFilterCompanion] = useState(false);
-  const [filterNdis, setFilterNdis] = useState(false);
+  const { toast } = useToast();
+  const sessionId = getSessionId();
 
-  const params = new URLSearchParams();
-  if (search) params.set("search", search);
-  if (filterType) params.set("type", filterType);
-  if (filterState) params.set("state", filterState);
-  if (filterWheelchair) params.set("wheelchair", "true");
-  if (filterCompanion) params.set("companion", "true");
-  if (filterNdis) params.set("ndis", "true");
+  const [step, setStep] = useState<"search" | "results" | "confirmation">("search");
+  const [activeTab, setActiveTab] = useState("book");
 
-  const { data: providers = [], isLoading } = useQuery<TransportProvider[]>({
-    queryKey: ["/api/transport", params.toString()],
-    queryFn: () => fetch(`/api/transport?${params.toString()}`).then(r => r.json()),
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [dropoffAddress, setDropoffAddress] = useState("");
+  const [accessNeeds, setAccessNeeds] = useState<string[]>([]);
+  const [companionCount, setCompanionCount] = useState(0);
+  const [fundingType, setFundingType] = useState("private");
+
+  const [quoteResult, setQuoteResult] = useState<QuoteResult | null>(null);
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
+  const [bookingResult, setBookingResult] = useState<BookingResult | null>(null);
+
+  const { data: trips = [], isLoading: tripsLoading, refetch: refetchTrips } = useQuery<Trip[]>({
+    queryKey: ["/api/transport/trips", sessionId],
+    queryFn: () =>
+      fetch(`/api/transport/trips?sessionId=${encodeURIComponent(sessionId)}`, { credentials: "include" })
+        .then(r => r.json()),
   });
 
-  const clearFilters = () => {
-    setSearch("");
-    setFilterType("");
-    setFilterState("");
-    setFilterWheelchair(false);
-    setFilterCompanion(false);
-    setFilterNdis(false);
+  const quoteMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/transport/quote", data),
+    onSuccess: async (res) => {
+      const data = await res.json();
+      setQuoteResult(data);
+      setStep("results");
+      setSelectedOptionIndex(null);
+    },
+    onError: async (err: any) => {
+      const msg = err?.message || "Failed to get quotes. Please try again.";
+      toast({ title: "Quote failed", description: msg, variant: "destructive" });
+    },
+  });
+
+  const bookMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/transport/trips", data),
+    onSuccess: async (res) => {
+      const data = await res.json();
+      setBookingResult(data);
+      setStep("confirmation");
+      queryClient.invalidateQueries({ queryKey: ["/api/transport/trips", sessionId] });
+    },
+    onError: async (err: any) => {
+      const msg = err?.message || "Booking failed. Please try again.";
+      toast({ title: "Booking failed", description: msg, variant: "destructive" });
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (tripId: number) => apiRequest("POST", `/api/transport/trips/${tripId}/cancel`, { sessionId }),
+    onSuccess: () => {
+      toast({ title: "Trip cancelled", description: "Your booking has been cancelled." });
+      queryClient.invalidateQueries({ queryKey: ["/api/transport/trips", sessionId] });
+    },
+    onError: () => {
+      toast({ title: "Cancel failed", description: "Unable to cancel. Please try again.", variant: "destructive" });
+    },
+  });
+
+  const toggleAccessNeed = useCallback((id: string) => {
+    setAccessNeeds(prev =>
+      prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]
+    );
+  }, []);
+
+  const [geocoding, setGeocoding] = useState(false);
+
+  const handleSearch = async () => {
+    if (!pickupAddress.trim() || !dropoffAddress.trim()) {
+      toast({ title: "Missing details", description: "Please enter both pickup and dropoff addresses.", variant: "destructive" });
+      return;
+    }
+    setGeocoding(true);
+    const [pickupCoords, dropoffCoords] = await Promise.all([
+      geocodeAddress(pickupAddress),
+      geocodeAddress(dropoffAddress),
+    ]);
+    setGeocoding(false);
+
+    if (!pickupCoords) {
+      toast({ title: "Address not found", description: `Could not locate pickup address: "${pickupAddress}". Try a suburb, street, or city name.`, variant: "destructive" });
+      return;
+    }
+    if (!dropoffCoords) {
+      toast({ title: "Address not found", description: `Could not locate dropoff address: "${dropoffAddress}". Try a suburb, street, or city name.`, variant: "destructive" });
+      return;
+    }
+
+    quoteMutation.mutate({
+      pickupAddress,
+      pickupLat: pickupCoords.lat,
+      pickupLng: pickupCoords.lng,
+      dropoffAddress,
+      dropoffLat: dropoffCoords.lat,
+      dropoffLng: dropoffCoords.lng,
+      accessNeeds,
+      companionCount,
+      fundingType,
+      sessionId,
+    });
   };
 
-  const hasFilters = search || filterType || filterState || filterWheelchair || filterCompanion || filterNdis;
+  const handleBook = () => {
+    if (selectedOptionIndex === null || !quoteResult) return;
+    bookMutation.mutate({
+      quoteId: quoteResult.quoteId,
+      selectedOptionIndex,
+      sessionId,
+    });
+  };
+
+  const resetSearch = () => {
+    setStep("search");
+    setQuoteResult(null);
+    setSelectedOptionIndex(null);
+    setBookingResult(null);
+  };
 
   return (
-    <main className="max-w-4xl mx-auto px-4 py-6" aria-label="Transport Search and Booking">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1B4B8A]" data-testid="heading-transport">
-            Accessible Transport
-          </h1>
-          <p className="text-gray-600 text-sm mt-1">Find accessible transport providers across Australia</p>
-        </div>
-        <div className="flex gap-2">
-          {user && <TripRequestForm />}
-          {user && <SubmitProviderDialog />}
-        </div>
-      </div>
-
-      <Tabs defaultValue="directory">
-        <TabsList className="mb-4" aria-label="Transport sections">
-          <TabsTrigger value="directory" data-testid="tab-directory">
-            <Bus className="w-4 h-4 mr-1.5" /> Provider Directory
-          </TabsTrigger>
-          {user && (
-            <TabsTrigger value="my-trips" data-testid="tab-my-trips">
-              <CalendarDays className="w-4 h-4 mr-1.5" /> My Trip Requests
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="info" data-testid="tab-info">
-            <Info className="w-4 h-4 mr-1.5" /> NDIS Transport Info
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="directory">
-          {/* Search + Filters */}
-          <div className="bg-white rounded-xl border p-4 mb-4 space-y-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                className="pl-9"
-                placeholder="Search transport providers..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                data-testid="input-search-transport"
-                aria-label="Search transport providers"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="w-44" data-testid="select-filter-type">
-                  <SelectValue placeholder="All types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All types</SelectItem>
-                  {Object.entries(TRANSPORT_TYPES).map(([v, { label }]) => (
-                    <SelectItem key={v} value={v}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filterState} onValueChange={setFilterState}>
-                <SelectTrigger className="w-36" data-testid="select-filter-state">
-                  <SelectValue placeholder="All states" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All states</SelectItem>
-                  {STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <label className="flex items-center gap-1.5 text-sm cursor-pointer select-none border rounded-md px-3 py-1.5 hover:bg-gray-50">
-                <Checkbox checked={filterWheelchair} onCheckedChange={v => setFilterWheelchair(!!v)} data-testid="checkbox-filter-wheelchair" />
-                ♿ Wheelchair
-              </label>
-              <label className="flex items-center gap-1.5 text-sm cursor-pointer select-none border rounded-md px-3 py-1.5 hover:bg-gray-50">
-                <Checkbox checked={filterCompanion} onCheckedChange={v => setFilterCompanion(!!v)} data-testid="checkbox-filter-companion" />
-                Companion Card
-              </label>
-              <label className="flex items-center gap-1.5 text-sm cursor-pointer select-none border rounded-md px-3 py-1.5 hover:bg-gray-50">
-                <Checkbox checked={filterNdis} onCheckedChange={v => setFilterNdis(!!v)} data-testid="checkbox-filter-ndis" />
-                NDIS Funded
-              </label>
-              {hasFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="text-gray-500" data-testid="button-clear-filters">
-                  Clear filters
-                </Button>
-              )}
-            </div>
+    <Layout>
+      <SEO
+        title="Book Accessible Transport - DisabilitySquare"
+        description="Find and book wheelchair-accessible transport in Australia with NDIS support"
+      />
+      <div className="max-w-3xl mx-auto space-y-6">
+        <div className="flex items-center gap-3">
+          <Bus className="h-8 w-8 text-primary" aria-hidden="true" />
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Accessible Transport</h1>
+            <p className="text-muted-foreground mt-0.5">Book wheelchair-accessible rides with NDIS support options</p>
           </div>
+        </div>
 
-          {isLoading ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[...Array(4)].map((_, i) => (
-                <Card key={i} className="animate-pulse"><CardContent className="p-4 h-32 bg-gray-50" /></Card>
-              ))}
-            </div>
-          ) : providers.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <Car className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No providers found</p>
-              <p className="text-sm mt-1">Try adjusting your filters or submit a provider to help the community.</p>
-            </div>
-          ) : (
-            <>
-              <p className="text-sm text-gray-500 mb-3">{providers.length} provider{providers.length !== 1 ? "s" : ""} found</p>
-              <div className="grid gap-3 sm:grid-cols-2" data-testid="list-providers">
-                {providers.map(p => <ProviderCard key={p.id} provider={p} />)}
-              </div>
-            </>
-          )}
-        </TabsContent>
+        <Tabs value={activeTab} onValueChange={setActiveTab} data-testid="tabs-transport">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="book" data-testid="tab-book">Book a Ride</TabsTrigger>
+            <TabsTrigger value="trips" data-testid="tab-my-trips">My Trips</TabsTrigger>
+          </TabsList>
 
-        {user && (
-          <TabsContent value="my-trips">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-[#1B4B8A]">My Trip Requests</h2>
-              <TripRequestForm />
-            </div>
-            <MyTrips />
-          </TabsContent>
-        )}
-
-        <TabsContent value="info">
-          <div className="space-y-4">
-            <Card className="border-l-4 border-l-[#E07830]">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base text-[#1B4B8A]">NDIS Transport Supports</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-gray-700 space-y-2">
-                <p>The NDIS can fund transport supports to help you get to work, education, community activities, and health appointments.</p>
-                <p>Transport funding is included under <strong>Core Supports — Transport</strong> and is separate from other support categories.</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>Must be included in your NDIS plan</li>
-                  <li>Reviewed annually at your plan review</li>
-                  <li>Can pay for taxis, rideshare, community transport, or NDIS-registered providers</li>
-                  <li>Self-managed or plan-managed participants have more flexibility</li>
-                </ul>
-                <a href="https://www.ndis.gov.au/participants/using-your-plan/transport" target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[#1B4B8A] underline font-medium mt-1">
-                  <Globe className="w-3.5 h-3.5" /> Learn more on the NDIS website
-                </a>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base text-[#1B4B8A]">Companion Card Program</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-gray-700 space-y-2">
-                <p>The Companion Card entitles people with a disability who need a companion to attend activities to a second ticket at no extra cost.</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>Accepted by many public transport operators</li>
-                  <li>Apply through your state/territory government</li>
-                  <li>Free for the cardholder's companion on participating transport</li>
-                </ul>
-                <a href="https://www.companioncard.gov.au" target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[#1B4B8A] underline font-medium mt-1">
-                  <Globe className="w-3.5 h-3.5" /> companioncard.gov.au
-                </a>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base text-[#1B4B8A]">Community Transport</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-gray-700 space-y-2">
-                <p>Community transport services provide affordable, door-to-door transport for people who cannot use public transport.</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>Subsidised by state governments and local councils</li>
-                  <li>Often not NDIS registered but can use NDIS transport funding</li>
-                  <li>Good option for medical appointments and social activities</li>
-                  <li>Search by postcode at your local council website</li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base text-[#1B4B8A]">Taxi Subsidy Schemes</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-gray-700 space-y-2">
-                <p>Most Australian states have taxi subsidy or assistance schemes for people with disability who cannot use public transport.</p>
-                <div className="grid sm:grid-cols-2 gap-1 text-xs">
-                  {[
-                    ["NSW", "Transport for NSW Taxi Transport Subsidy Scheme"],
-                    ["VIC", "Multi Purpose Taxi Program (MPTP)"],
-                    ["QLD", "Taxi Subsidy Scheme (TSS)"],
-                    ["WA", "Taxi User Subsidy Scheme (TUSS)"],
-                    ["SA", "Patient Assistance Transport Scheme (PATS)"],
-                    ["TAS", "Community Passenger Networks"],
-                    ["ACT", "Taxi Subsidy Scheme (ACT)"],
-                  ].map(([state, scheme]) => (
-                    <div key={state} className="flex gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5 text-[#2A9D8F] shrink-0 mt-0.5" />
-                      <span><strong>{state}:</strong> {scheme}</span>
+          <TabsContent value="book" className="space-y-4 mt-4">
+            {step === "search" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xl">Plan Your Trip</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="pickup-address" className="text-base font-medium">
+                        <MapPin className="inline h-4 w-4 mr-1 text-green-600" aria-hidden="true" />
+                        Pickup address
+                      </Label>
+                      <Input
+                        id="pickup-address"
+                        placeholder="e.g. 100 George Street, Sydney NSW"
+                        value={pickupAddress}
+                        onChange={e => setPickupAddress(e.target.value)}
+                        className="mt-1"
+                        data-testid="input-pickup-address"
+                        aria-label="Pickup address"
+                      />
                     </div>
+                    <div>
+                      <Label htmlFor="dropoff-address" className="text-base font-medium">
+                        <MapPin className="inline h-4 w-4 mr-1 text-red-500" aria-hidden="true" />
+                        Dropoff address
+                      </Label>
+                      <Input
+                        id="dropoff-address"
+                        placeholder="e.g. 1 Hospital Drive, Westmead NSW"
+                        value={dropoffAddress}
+                        onChange={e => setDropoffAddress(e.target.value)}
+                        className="mt-1"
+                        data-testid="input-dropoff-address"
+                        aria-label="Dropoff address"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-base font-medium mb-2">Accessibility needs</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="group" aria-label="Accessibility needs">
+                      {ACCESS_NEEDS.map(need => (
+                        <div key={need.id} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`need-${need.id}`}
+                            checked={accessNeeds.includes(need.id)}
+                            onCheckedChange={() => toggleAccessNeed(need.id)}
+                            data-testid={`checkbox-need-${need.id}`}
+                          />
+                          <Label htmlFor={`need-${need.id}`} className="cursor-pointer font-normal">
+                            {need.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="companion-count" className="text-base font-medium">
+                        <Users className="inline h-4 w-4 mr-1" aria-hidden="true" />
+                        Companions
+                      </Label>
+                      <Select
+                        value={String(companionCount)}
+                        onValueChange={v => setCompanionCount(Number(v))}
+                      >
+                        <SelectTrigger
+                          id="companion-count"
+                          className="mt-1"
+                          data-testid="select-companion-count"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[0, 1, 2, 3, 4, 5].map(n => (
+                            <SelectItem key={n} value={String(n)}>
+                              {n === 0 ? "Just me" : `${n} companion${n > 1 ? "s" : ""}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="funding-type" className="text-base font-medium">Funding type</Label>
+                      <Select value={fundingType} onValueChange={setFundingType}>
+                        <SelectTrigger
+                          id="funding-type"
+                          className="mt-1"
+                          data-testid="select-funding-type"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {FUNDING_TYPES.map(f => (
+                            <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleSearch}
+                    disabled={quoteMutation.isPending || geocoding}
+                    className="w-full"
+                    size="lg"
+                    data-testid="button-get-quotes"
+                    aria-label="Search for available transport options"
+                  >
+                    {geocoding ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
+                        Locating addresses...
+                      </>
+                    ) : quoteMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
+                        Finding options...
+                      </>
+                    ) : (
+                      <>
+                        Find Transport Options
+                        <ArrowRight className="h-4 w-4 ml-2" aria-hidden="true" />
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {step === "results" && quoteResult && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={resetSearch}
+                    data-testid="button-back-to-search"
+                    aria-label="Back to search"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" aria-hidden="true" />
+                    Back
+                  </Button>
+                </div>
+
+                <Card className="bg-muted/30">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex gap-4 flex-wrap text-sm">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <MapPin className="h-3.5 w-3.5 text-green-600" aria-hidden="true" />
+                        {pickupAddress}
+                      </span>
+                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground self-center" aria-hidden="true" />
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <MapPin className="h-3.5 w-3.5 text-red-500" aria-hidden="true" />
+                        {dropoffAddress}
+                      </span>
+                    </div>
+                    <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                      <span>{quoteResult.distanceKm.toFixed(1)} km</span>
+                      <span>~{quoteResult.durationMinutes} min drive</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <p className="font-semibold text-foreground" aria-live="polite">
+                  {quoteResult.options.length} option{quoteResult.options.length !== 1 ? "s" : ""} available
+                </p>
+
+                <div className="space-y-3" role="radiogroup" aria-label="Transport options">
+                  {quoteResult.options.map((option, idx) => (
+                    <Card
+                      key={idx}
+                      className={`cursor-pointer transition-all ${selectedOptionIndex === idx
+                        ? "border-primary shadow-md ring-2 ring-primary"
+                        : "hover:border-primary/50 hover:shadow-sm"
+                        }`}
+                      onClick={() => setSelectedOptionIndex(idx)}
+                      data-testid={`card-option-${idx}`}
+                      role="radio"
+                      aria-checked={selectedOptionIndex === idx}
+                      tabIndex={0}
+                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") setSelectedOptionIndex(idx); }}
+                    >
+                      <CardContent className="pt-4 pb-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold" data-testid={`text-provider-name-${idx}`}>
+                                {option.providerName}
+                              </span>
+                              <Badge variant="secondary" className="text-xs">
+                                {VEHICLE_LABELS[option.vehicleType] || option.vehicleType}
+                              </Badge>
+                              {option.ndisEligible && (
+                                <Badge className="text-xs bg-primary/10 text-primary border-primary/20" data-testid={`badge-ndis-${idx}`}>
+                                  <Star className="h-3 w-3 mr-1" aria-hidden="true" />
+                                  NDIS Eligible
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                                ~{option.etaMinutes} min ETA
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-xl font-bold text-foreground" data-testid={`text-price-${idx}`}>
+                              ${option.priceAud.toFixed(2)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">AUD</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </main>
+
+                <Button
+                  onClick={handleBook}
+                  disabled={selectedOptionIndex === null || bookMutation.isPending}
+                  className="w-full"
+                  size="lg"
+                  data-testid="button-book"
+                  aria-label="Book selected transport option"
+                >
+                  {bookMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
+                      Booking...
+                    </>
+                  ) : (
+                    <>
+                      Book
+                      {selectedOptionIndex !== null && (
+                        <span className="ml-1">
+                          — ${quoteResult.options[selectedOptionIndex]?.priceAud.toFixed(2)} AUD
+                        </span>
+                      )}
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {step === "confirmation" && bookingResult && (
+              <Card className="border-green-200 dark:border-green-800">
+                <CardContent className="pt-6 pb-6 text-center space-y-4">
+                  <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" aria-hidden="true" />
+                  <div>
+                    <h2 className="text-2xl font-bold text-foreground" data-testid="text-booking-confirmed">
+                      Booking Confirmed!
+                    </h2>
+                    <p className="text-muted-foreground mt-1">Your trip has been successfully booked.</p>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-4 text-sm space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Reference</span>
+                      <span className="font-mono font-bold" data-testid="text-reference-number">{bookingResult.referenceNumber}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Provider</span>
+                      <span>{bookingResult.providerName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Vehicle</span>
+                      <span>{VEHICLE_LABELS[bookingResult.vehicleType] || bookingResult.vehicleType}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">ETA</span>
+                      <span>~{bookingResult.etaMinutes} minutes</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Price</span>
+                      <span className="font-semibold">${Number(bookingResult.priceAud).toFixed(2)} AUD</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Status</span>
+                      <span className="capitalize">{bookingResult.status}</span>
+                    </div>
+                  </div>
+                  {bookingResult.message && (
+                    <p className="text-sm text-muted-foreground">{bookingResult.message}</p>
+                  )}
+                  <div className="flex gap-3 justify-center">
+                    <Button
+                      onClick={resetSearch}
+                      variant="outline"
+                      data-testid="button-book-another"
+                      aria-label="Book another trip"
+                    >
+                      Book Another Trip
+                    </Button>
+                    <Button
+                      onClick={() => setActiveTab("trips")}
+                      data-testid="button-view-trips"
+                      aria-label="View my trips"
+                    >
+                      View My Trips
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="trips" className="space-y-4 mt-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">My Trips</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchTrips()}
+                data-testid="button-refresh-trips"
+                aria-label="Refresh trips list"
+              >
+                Refresh
+              </Button>
+            </div>
+
+            {tripsLoading ? (
+              <div className="space-y-3">
+                {[1, 2].map(i => (
+                  <Card key={i} className="animate-pulse">
+                    <CardContent className="pt-4 pb-4">
+                      <div className="h-5 bg-muted rounded w-1/2 mb-2" />
+                      <div className="h-4 bg-muted rounded w-full" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : trips.length === 0 ? (
+              <Card>
+                <CardContent className="py-16 text-center text-muted-foreground">
+                  <Bus className="h-12 w-12 mx-auto mb-3 opacity-30" aria-hidden="true" />
+                  <p className="text-lg font-medium mb-1">No trips yet</p>
+                  <p className="text-sm">Book a trip to get started!</p>
+                  <Button
+                    className="mt-4"
+                    onClick={() => setActiveTab("book")}
+                    data-testid="button-start-booking"
+                    aria-label="Start booking a trip"
+                  >
+                    Book a Trip
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {trips.map(trip => (
+                  <Card key={trip.id} data-testid={`card-trip-${trip.id}`}>
+                    <CardContent className="pt-4 pb-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-2">
+                            <span className="font-semibold">{trip.provider?.name || "Unknown Provider"}</span>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[trip.status] || "bg-muted text-muted-foreground"}`}
+                              data-testid={`status-trip-${trip.id}`}
+                              aria-label={`Trip status: ${STATUS_LABELS[trip.status] || trip.status}`}
+                            >
+                              {STATUS_LABELS[trip.status] || trip.status}
+                            </span>
+                          </div>
+                          <div className="text-sm text-muted-foreground space-y-1">
+                            <p className="flex items-start gap-1.5">
+                              <MapPin className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" aria-hidden="true" />
+                              <span className="truncate">{trip.pickupAddress}</span>
+                            </p>
+                            <p className="flex items-start gap-1.5">
+                              <MapPin className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
+                              <span className="truncate">{trip.dropoffAddress}</span>
+                            </p>
+                          </div>
+                          {trip.externalRef && (
+                            <p className="text-xs text-muted-foreground mt-1.5 font-mono" data-testid={`text-trip-ref-${trip.id}`}>
+                              Ref: {trip.externalRef}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-foreground">${parseFloat(trip.priceAud).toFixed(2)}</p>
+                          <p className="text-xs text-muted-foreground">AUD</p>
+                          {(trip.status === "pending" || trip.status === "confirmed") && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="mt-2 text-xs"
+                              onClick={() => cancelMutation.mutate(trip.id)}
+                              disabled={cancelMutation.isPending}
+                              data-testid={`button-cancel-trip-${trip.id}`}
+                              aria-label={`Cancel trip ${trip.id}`}
+                            >
+                              {cancelMutation.isPending ? (
+                                <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                              ) : (
+                                <>
+                                  <XCircle className="h-3 w-3 mr-1" aria-hidden="true" />
+                                  Cancel
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+    </Layout>
   );
 }

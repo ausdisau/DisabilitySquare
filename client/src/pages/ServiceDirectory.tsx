@@ -16,7 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Phone, Mail, Globe, MapPin, Building2, Plus, Search, CheckCircle2, Info } from "lucide-react";
+import { Phone, Mail, Globe, MapPin, Building2, Plus, Search, CheckCircle2, Info, Bus, ArrowRight } from "lucide-react";
+import { Link } from "wouter";
 
 const CATEGORIES = [
   { value: "allied_health", label: "Allied Health" },
@@ -104,6 +105,26 @@ export default function ServiceDirectory() {
     <Layout>
       <SEO title="Service Directory - DisabilitySquare" description="Find disability service providers in Australia" />
       <div className="max-w-5xl mx-auto space-y-6">
+        <Link href="/transport">
+          <div
+            className="flex items-center justify-between bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors rounded-xl p-4 cursor-pointer"
+            data-testid="banner-book-transport"
+            role="link"
+            aria-label="Book Accessible Transport"
+          >
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Bus className="h-5 w-5 text-primary" aria-hidden="true" />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">Book Accessible Transport</p>
+                <p className="text-sm text-muted-foreground">Wheelchair-accessible vehicles with NDIS support options</p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-primary shrink-0" aria-hidden="true" />
+          </div>
+        </Link>
+
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
