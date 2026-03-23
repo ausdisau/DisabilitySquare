@@ -7,6 +7,7 @@ import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
 import { CreatePostDialog } from "./CreatePostDialog";
+import { Footer } from "./Footer";
 
 function TopBar() {
   const { user } = useAuth();
@@ -102,6 +103,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         aria-atomic="true"
         className="sr-only"
       />
+
+      <Footer />
     </div>
   );
 }

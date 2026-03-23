@@ -204,6 +204,42 @@ export async function registerRoutes(
     res.json(members);
   });
 
+  // === PUBLIC COMMUNITY STATS (no auth required) ===
+  app.get('/api/public/stats', async (req, res) => {
+    try {
+      const categories = await storage.listForumCategories();
+      const memberCount = await storage.getPublicMemberCount();
+      const totalThreads = categories.reduce((sum, c) => sum + (c.threadCount || 0), 0);
+      res.json({
+        memberCount,
+        threadCount: totalThreads,
+        categoryCount: categories.length,
+      });
+    } catch {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // GET /api/public/categories — public forum categories (no auth required)
+  app.get('/api/public/categories', async (req, res) => {
+    try {
+      const categories = await storage.listForumCategories();
+      res.json(categories);
+    } catch {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // GET /api/public/recent-threads — 10 most recent thread titles + category, no author info
+  app.get('/api/public/recent-threads', async (req, res) => {
+    try {
+      const threads = await storage.listRecentPublicThreads(10);
+      res.json(threads);
+    } catch {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // === COMMENTS ===
   app.post(api.comments.create.path, isAuthenticated, async (req: any, res) => {
     try {

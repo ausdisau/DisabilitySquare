@@ -126,6 +126,10 @@ export interface IStorage {
   getPeerMatches(userId: string, limit?: number): Promise<(User & { profile: Profile | null })[]>;
   listAllProfiles(): Promise<(User & { profile: Profile | null })[]>;
 
+  // Public stats (no auth required)
+  getPublicMemberCount(): Promise<number>;
+  listRecentPublicThreads(limit: number): Promise<{ id: number; title: string; categoryName: string; categorySlug: string; createdAt: Date | null }[]>;
+
   // Community Forums
   seedForumCategories(): Promise<void>;
   listForumCategories(): Promise<ForumCategory[]>;
@@ -868,6 +872,27 @@ export class DatabaseStorage implements IStorage {
       .where(eq(userReports.id, id))
       .returning();
     return updated;
+  }
+
+  async getPublicMemberCount(): Promise<number> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(users);
+    return Number(result?.count ?? 0);
+  }
+
+  async listRecentPublicThreads(limit: number): Promise<{ id: number; title: string; categoryName: string; categorySlug: string; createdAt: Date | null }[]> {
+    const rows = await db
+      .select({
+        id: forumThreads.id,
+        title: forumThreads.title,
+        categoryName: forumCategories.name,
+        categorySlug: forumCategories.slug,
+        createdAt: forumThreads.createdAt,
+      })
+      .from(forumThreads)
+      .innerJoin(forumCategories, eq(forumThreads.categoryId, forumCategories.id))
+      .orderBy(desc(forumThreads.lastActivityAt))
+      .limit(limit);
+    return rows;
   }
 
   // === COMMUNITY FORUMS ===
