@@ -16,7 +16,7 @@ function TopBar() {
       <div className="flex items-center gap-3 w-[240px] shrink-0">
         <img src="/logo.png" alt="DisabilitySquare Logo" className="h-7 w-7 object-contain" />
         <Link href="/">
-          <span className="font-bold text-primary text-base tracking-wide hover:text-primary/80 cursor-pointer hidden sm:inline">
+          <span className="font-bold text-white text-base tracking-wide hover:text-white/80 cursor-pointer hidden sm:inline">
             DisabilitySquare
           </span>
         </Link>
@@ -24,11 +24,11 @@ function TopBar() {
 
       <div className="flex-1 flex justify-center px-4 max-w-xl mx-auto">
         <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" aria-hidden="true" />
           <input
             type="search"
             placeholder="Search the village…"
-            className="w-full pl-9 pr-4 py-2 text-sm bg-muted/60 border border-border/40 rounded-full focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-card transition-all"
+            className="w-full pl-9 pr-4 py-2 text-sm bg-white/15 border border-white/20 rounded-full text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 focus:bg-white/20 transition-all"
             aria-label="Search DisabilitySquare"
             data-testid="input-search"
           />
@@ -48,7 +48,7 @@ function TopBar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-foreground hover:bg-muted"
+                className="h-9 w-9 text-white hover:bg-white/20"
                 aria-label="Open navigation menu"
                 data-testid="button-mobile-menu"
               >

@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMyPoints } from "@/hooks/use-valorization";
 import {
   Home, Users, Gamepad2, User, Trophy, Puzzle,
-  Spline, BookOpen, Building2, BookMarked, Briefcase, Bus, Star, HeartHandshake, MessageCircle, Shield,
+  Spline, BookOpen, Building2, BookMarked, Briefcase, Bus, HeartHandshake, MessageCircle, Shield,
 } from "lucide-react";
 import { CreatePostDialog } from "./CreatePostDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -22,7 +22,6 @@ const navItems = [
   { href: "/recognition", label: "Recognition", icon: Trophy },
   { href: "/games", label: "Games", icon: Gamepad2 },
   { href: "/extensions", label: "Extensions", icon: Puzzle },
-  { href: "/profile", label: "My Profile", icon: User },
 ];
 
 export function Sidebar() {
@@ -34,8 +33,54 @@ export function Sidebar() {
   const fullName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "Member";
 
   return (
-    <nav role="navigation" aria-label="Main navigation" className="w-full flex flex-col h-full py-4 px-3">
-      <div className="flex-1 space-y-1">
+    <nav role="navigation" aria-label="Main navigation" className="w-full flex flex-col h-full py-3 px-3">
+
+      {/* Profile panel — identity first, Bebo/MySpace style */}
+      {user && (
+        <Link href="/profile">
+          <div
+            className="sm-profile-panel cursor-pointer hover:opacity-95 transition-opacity mb-2"
+            data-testid="link-user-profile"
+            aria-label={`Go to ${fullName}'s profile`}
+          >
+            <div className="flex items-center gap-3">
+              <Avatar className="h-11 w-11 shrink-0 ring-2 ring-white/40">
+                <AvatarImage src={user?.profileImageUrl || undefined} />
+                <AvatarFallback className="bg-white/20 text-white text-sm font-bold">
+                  {initials || "?"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white truncate leading-tight">{fullName}</p>
+                <p className="text-[11px] text-white/70 mt-0.5">Community Member</p>
+              </div>
+            </div>
+            {myPoints && (
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/20">
+                <div className="flex-1 text-center">
+                  <p className="text-base font-bold text-white" data-testid="text-my-points">{myPoints.totalPoints}</p>
+                  <p className="text-[10px] text-white/60 uppercase tracking-wide">Points</p>
+                </div>
+                <div className="w-px h-8 bg-white/20" />
+                <div className="flex-1 text-center">
+                  <p className="text-base font-bold text-white">Lv {myPoints.level}</p>
+                  <p className="text-[10px] text-white/60 uppercase tracking-wide">Level</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </Link>
+      )}
+
+      {/* Post button */}
+      <div className="mb-3 px-1">
+        <CreatePostDialog />
+      </div>
+
+      <div className="sm-divider mb-1" />
+
+      {/* Navigation items */}
+      <div className="flex-1 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = location === item.href;
           return (
@@ -46,7 +91,8 @@ export function Sidebar() {
                 aria-current={isActive ? "page" : undefined}
               >
                 <item.icon
-                  className={`sm-nav-icon h-5 w-5 shrink-0 ${isActive ? "text-primary" : "text-foreground/70"}`}
+                  className={`sm-nav-icon h-4.5 w-4.5 shrink-0`}
+                  style={{ height: "18px", width: "18px" }}
                   aria-hidden="true"
                 />
                 <span>{item.label}</span>
@@ -54,68 +100,47 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Profile link */}
+        <Link href="/profile">
+          <div
+            className={`sm-nav-link ${location === "/profile" ? "active" : ""}`}
+            data-testid="link-nav-my-profile"
+            aria-current={location === "/profile" ? "page" : undefined}
+          >
+            <User style={{ height: "18px", width: "18px" }} className="sm-nav-icon shrink-0" aria-hidden="true" />
+            <span>My Profile</span>
+          </div>
+        </Link>
       </div>
 
-      <div className="mt-4 px-1">
-        <CreatePostDialog />
-      </div>
+      <div className="sm-divider mt-2" />
 
-      <div className="sm-divider mt-4" />
-
-      {/* Safety & Legal links */}
-      <div className="mt-2 space-y-1">
+      {/* Safety & Legal */}
+      <div className="mt-1 space-y-0.5">
         <Link href="/safety">
           <div
-            className={`sm-nav-link ${location === "/safety" ? "active" : ""}`}
+            className={`sm-nav-link text-xs ${location === "/safety" ? "active" : ""}`}
+            style={{ padding: "7px 14px", fontSize: "12px" }}
             data-testid="link-nav-safety-centre"
-            aria-current={location === "/safety" ? "page" : undefined}
           >
-            <Shield
-              className={`sm-nav-icon h-5 w-5 shrink-0 ${location === "/safety" ? "text-primary" : "text-foreground/70"}`}
-              aria-hidden="true"
-            />
+            <Shield style={{ height: "15px", width: "15px" }} className="shrink-0" aria-hidden="true" />
             <span>Safety Centre</span>
           </div>
         </Link>
-        <div className="flex gap-3 px-3 py-1">
+        <div className="flex gap-4 px-3 py-1">
           <Link href="/terms">
-            <span className="text-xs text-muted-foreground hover:text-primary underline cursor-pointer" data-testid="link-nav-terms">
+            <span className="text-[11px] text-muted-foreground hover:text-primary transition-colors cursor-pointer" data-testid="link-nav-terms">
               Terms
             </span>
           </Link>
           <Link href="/privacy">
-            <span className="text-xs text-muted-foreground hover:text-primary underline cursor-pointer" data-testid="link-nav-privacy">
+            <span className="text-[11px] text-muted-foreground hover:text-primary transition-colors cursor-pointer" data-testid="link-nav-privacy">
               Privacy
             </span>
           </Link>
         </div>
       </div>
-
-      <div className="sm-divider mt-2" />
-
-      <Link href="/profile">
-        <div
-          className="flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-muted cursor-pointer transition-colors"
-          data-testid="link-user-profile"
-          aria-label={`Go to ${fullName}'s profile`}
-        >
-          <Avatar className="h-9 w-9 shrink-0">
-            <AvatarImage src={user?.profileImageUrl || undefined} />
-            <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
-              {initials || "?"}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">{fullName}</p>
-            {myPoints && (
-              <p className="text-xs text-muted-foreground" data-testid="text-my-points">
-                <Star className="h-3 w-3 inline mr-0.5 text-accent" aria-hidden="true" />
-                {myPoints.totalPoints} pts · Lv {myPoints.level}
-              </p>
-            )}
-          </div>
-        </div>
-      </Link>
     </nav>
   );
 }

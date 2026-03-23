@@ -41,71 +41,69 @@ export function PostCard({ post }: { post: PostWithAuthor }) {
 
   return (
     <article className="sm-post" data-testid={`card-post-${post.id}`}>
-      <div className="flex gap-3 px-4 pt-4 pb-3">
-        <div className="shrink-0">
-          <Avatar className="h-10 w-10 rounded-full ring-2 ring-border/30">
-            <AvatarImage src={post.author.profileImageUrl || undefined} />
-            <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold rounded-full">
-              {authorInitials}
-            </AvatarFallback>
-          </Avatar>
-        </div>
-
+      {/* Wall-post author header — identity first (Bebo-style) */}
+      <div className="flex items-center gap-3 px-4 pt-3 pb-2.5 border-b border-border/30 bg-primary/[0.03]">
+        <Avatar className="h-9 w-9 rounded-full shrink-0 ring-2 ring-primary/15">
+          <AvatarImage src={post.author.profileImageUrl || undefined} />
+          <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold rounded-full">
+            {authorInitials}
+          </AvatarFallback>
+        </Avatar>
         <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="font-semibold text-foreground text-sm leading-tight">{authorName}</span>
-            <span className="text-muted-foreground text-xs shrink-0">{timeAgo}</span>
-            {post.author.id && post.author.id !== user?.id && (
-              <div className="ml-auto">
-                <ReportUserButton
-                  userId={post.author.id}
-                  userName={authorName}
-                  variant="dropdown"
-                />
-              </div>
-            )}
+          <span className="font-bold text-foreground text-sm leading-tight block truncate">{authorName}</span>
+          <span className="text-muted-foreground text-[11px]">{timeAgo}</span>
+        </div>
+        {post.author.id && post.author.id !== user?.id && (
+          <ReportUserButton
+            userId={post.author.id}
+            userName={authorName}
+            variant="dropdown"
+          />
+        )}
+      </div>
+
+      {/* Post body */}
+      <div className="px-4 pt-3 pb-2">
+        {post.title && (
+          <p className="font-semibold text-foreground text-sm mb-1.5 leading-snug">{post.title}</p>
+        )}
+        <p className="text-foreground/80 text-sm whitespace-pre-wrap leading-relaxed">{post.content}</p>
+
+        {post.tags && Array.isArray(post.tags) && post.tags.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {(post.tags as string[]).map((tag: string) => (
+              <span key={tag} className="sm-badge">{tag}</span>
+            ))}
           </div>
+        )}
+      </div>
 
-          {post.title && (
-            <p className="font-semibold text-foreground text-sm mb-1 leading-snug">{post.title}</p>
-          )}
-          <p className="text-foreground/80 text-sm whitespace-pre-wrap leading-relaxed">{post.content}</p>
+      {/* Action bar */}
+      <div className="flex items-center gap-1 px-3 pb-2 -ml-0.5">
+        <PostReactions postId={post.id} compact />
 
-          {post.tags && Array.isArray(post.tags) && post.tags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {(post.tags as string[]).map((tag: string) => (
-                <span key={tag} className="sm-badge">{tag}</span>
-              ))}
-            </div>
-          )}
+        <button
+          className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded-full hover:bg-primary/8 text-xs"
+          onClick={() => setShowComments(!showComments)}
+          data-testid={`button-comment-${post.id}`}
+          aria-expanded={showComments}
+          aria-label={`${showComments ? "Hide" : "Show"} comments`}
+        >
+          <MessageSquare className="h-4 w-4" />
+          <span>{post.comments?.length || 0}</span>
+        </button>
 
-          <div className="flex items-center gap-1 mt-3 -ml-1.5">
-            <PostReactions postId={post.id} compact />
-
-            <button
-              className="flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded-full hover:bg-primary/10 text-xs"
-              onClick={() => setShowComments(!showComments)}
-              data-testid={`button-comment-${post.id}`}
-              aria-expanded={showComments}
-              aria-label={`${showComments ? "Hide" : "Show"} comments`}
-            >
-              <MessageSquare className="h-4 w-4" />
-              <span>{post.comments?.length || 0}</span>
-            </button>
-
-            <div className="ml-auto flex items-center gap-1">
-              <TextToSpeech
-                text={`${post.title}. ${post.content}`}
-                label="Read post aloud"
-              />
-            </div>
-          </div>
+        <div className="ml-auto">
+          <TextToSpeech
+            text={`${post.title}. ${post.content}`}
+            label="Read post aloud"
+          />
         </div>
       </div>
 
       {showComments && (
-        <div className="border-t border-border/40 bg-muted/30 rounded-b-2xl">
-          <form onSubmit={handleComment} className="flex gap-2 px-4 py-3 border-b border-border/30">
+        <div className="border-t border-border/40 bg-muted/20">
+          <form onSubmit={handleComment} className="flex gap-2 px-4 py-3 border-b border-border/20">
             <Input
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
@@ -124,11 +122,11 @@ export function PostCard({ post }: { post: PostWithAuthor }) {
           </form>
 
           {post.comments && post.comments.length > 0 && (
-            <div className="divide-y divide-border/30">
+            <div className="divide-y divide-border/20">
               {post.comments.map((comment: any) => (
-                <div key={comment.id} className="px-4 py-3 flex gap-2">
+                <div key={comment.id} className="px-4 py-2.5 flex gap-2.5">
                   <Avatar className="h-7 w-7 rounded-full shrink-0">
-                    <AvatarFallback className="bg-muted text-muted-foreground text-[10px] font-bold rounded-full">
+                    <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold rounded-full">
                       {`${comment.author?.firstName?.[0] || ""}${comment.author?.lastName?.[0] || ""}`.toUpperCase() || "?"}
                     </AvatarFallback>
                   </Avatar>
@@ -136,8 +134,8 @@ export function PostCard({ post }: { post: PostWithAuthor }) {
                     <span className="font-semibold text-foreground text-xs mr-1.5">
                       {comment.author?.firstName} {comment.author?.lastName}
                     </span>
-                    <span className="text-foreground/80 text-xs">{comment.content}</span>
-                    <p className="text-muted-foreground text-[11px] mt-0.5">
+                    <span className="text-foreground/75 text-xs">{comment.content}</span>
+                    <p className="text-muted-foreground text-[10px] mt-0.5">
                       {formatDistanceToNow(new Date(comment.createdAt || new Date()), { addSuffix: true })}
                     </p>
                   </div>
