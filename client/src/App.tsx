@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AccessibilityProvider } from "@/components/AccessibilityProvider";
 import { AccessibilityPanel } from "@/components/AccessibilityPanel";
-import { SidebarStateProvider } from "@/hooks/use-sidebar-state";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { AgeVerificationOnboarding } from "@/components/AgeVerificationOnboarding";
@@ -95,10 +94,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AccessibilityProvider>
-          <SidebarStateProvider>
-            <Toaster />
-            <Router />
-          </SidebarStateProvider>
+          <Toaster />
+          <Router />
         </AccessibilityProvider>
       </TooltipProvider>
     </QueryClientProvider>

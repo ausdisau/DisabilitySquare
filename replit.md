@@ -202,3 +202,4 @@ Five key features added to differentiate DisabilitySquare:
 - Seeded 10 service providers, 10 resources, 6 job listings (all approved)
 - Added Transport module: accessible transport directory, trip requests, NDIS info
 - Seeded 10 Australian accessible transport providers (all approved)
+- Redesigned UI to 2004-era social network aesthetic: fixed-width boxy layout, colored section headers, flat post cards, top nav bar, chronological feed with right sidebar (community stats, top members, groups)

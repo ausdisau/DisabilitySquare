@@ -41,7 +41,7 @@
     --input: 213 20% 85%;
     --ring: 213 67% 33%;
     
-    --radius: 0.75rem;
+    --radius: 0.2rem;
     
     --sidebar-background: 213 67% 28%;
     --sidebar-foreground: 40 23% 95%;
@@ -285,6 +285,149 @@
 /* High contrast scrollbar */
 .high-contrast::-webkit-scrollbar-thumb {
   background-color: hsl(var(--foreground));
+}
+
+/* =============================================
+   2004-ERA RETRO SOCIAL NETWORK STYLES
+   ============================================= */
+
+/* Retro section box — the core 2004 UI pattern */
+.retro-box {
+  border: 1px solid #b0b8c8;
+  background: #fff;
+  margin-bottom: 8px;
+}
+.retro-box-header {
+  background: #1B4B8A;
+  color: #fff;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.retro-box-content {
+  padding: 8px;
+}
+
+/* Retro post card — boxy wall post style */
+.retro-post {
+  border: 1px solid #c8d0dc;
+  background: #fff;
+  margin-bottom: 8px;
+}
+.retro-post-header {
+  background: #eef2f8;
+  border-bottom: 1px solid #c8d0dc;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.retro-post-body {
+  padding: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.retro-post-footer {
+  background: #f6f8fb;
+  border-top: 1px solid #e0e6ef;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+
+/* Retro top navigation bar */
+.retro-topbar {
+  background: #1B4B8A;
+  color: #fff;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  border-bottom: 2px solid #E07830;
+  font-size: 12px;
+}
+
+/* Retro nav link */
+.retro-nav-link {
+  color: #ddeeff;
+  text-decoration: none;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+.retro-nav-link:hover,
+.retro-nav-link.active {
+  background: #E07830;
+  color: #fff;
+}
+.retro-nav-link-sidebar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #1B4B8A;
+  text-decoration: none;
+  border-bottom: 1px solid #f0f0f0;
+}
+.retro-nav-link-sidebar:hover {
+  background: #eef2f8;
+  color: #E07830;
+}
+.retro-nav-link-sidebar.active {
+  background: #1B4B8A;
+  color: #fff;
+  font-weight: bold;
+}
+
+/* Retro sidebar */
+.retro-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+}
+
+/* Retro divider */
+.retro-divider {
+  height: 1px;
+  background: #c8d0dc;
+  margin: 6px 0;
+}
+
+/* Retro stat badge */
+.retro-stat {
+  display: inline-block;
+  background: #E07830;
+  color: #fff;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 5px;
+  border-radius: 2px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Retro badge pill */
+.retro-badge {
+  display: inline-block;
+  background: #2A9D8F;
+  color: #fff;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 6px;
+  border-radius: 2px;
 }
 
 /* Keyboard shortcut badge styles */
