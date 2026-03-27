@@ -34,6 +34,7 @@ The UI/UX is designed with a 2004-era social network aesthetic, featuring a fixe
     - **Peer Connect**: Matches users by shared diagnosis, interests, and location.
     - **Daily Wellness Check-In**: Quick mood check-in with streak tracking.
 - **Community Forums**: Structured bulletin board with 8 categories, thread types (General, Advice Request), upvoting, accepted answers, and valorization points for participation.
+- **Blogs & Personal Stories**: Long-form writing space where members can publish personal stories, lived-experience articles, and community essays. Features include draft/publish workflow, rich textarea editor, tags (up to 5), empathetic reactions (hug, me too, helpful, inspiring), comments, and safety reporting on posts. Pages: `/blogs` (listing with tag filter), `/blogs/write` (new post), `/blogs/edit/:id` (edit), `/blogs/my` (manage own posts), `/blogs/:slug` (post detail).
 
 - **Discover & Participate**: Personalised social graph with people suggestions, matched services, accessible events with venue accessibility metadata, and a 5-step Participation Journey wizard (activity → support needs → service provider → accessible transport → confirm).
 - **Admin eSafety Reports**: Moderation dashboard for reviewing eSafety reports with scheme classification, status workflow, and user deactivation.
@@ -42,7 +43,7 @@ The UI/UX is designed with a 2004-era social network aesthetic, featuring a fixe
 All pages use `sm-*` CSS tokens defined in `index.css` — never use shadcn `Card`/`CardContent`/`CardHeader`/`CardTitle` for page-level layouts. Key tokens: `sm-card`, `sm-card-title`, `sm-card-body`, `sm-post` (left accent border), `sm-nav-link`, `sm-profile-panel` (navy gradient identity card at top of sidebar), `sm-topbar`.
 
 ### Database Schema
-Key tables include `users`, `profiles`, `groups`, `posts`, `comments`, `gameScores`, `badges`, `user_badges`, `points_ledger`, `user_points`, `transport_providers`, `transport_vehicles`, `trip_quotes`, `trips`, `post_reactions`, `forum_categories`, `forum_threads`, `forum_replies`, `forum_votes`, `venues`, `events`, `event_attendees`, `user_connections`, `user_service_affinities`, and `participation_journeys`.
+Key tables include `users`, `profiles`, `groups`, `posts`, `comments`, `gameScores`, `badges`, `user_badges`, `points_ledger`, `user_points`, `transport_providers`, `transport_vehicles`, `trip_quotes`, `trips`, `post_reactions`, `forum_categories`, `forum_threads`, `forum_replies`, `forum_votes`, `venues`, `events`, `event_attendees`, `user_connections`, `user_service_affinities`, `participation_journeys`, `blog_posts`, `blog_comments`, and `blog_post_reactions`.
 
 ### DB Column Notes
 - `transport_providers` table: uses `kind` column (not `type`), has `ndis_support`, `rate_card` (jsonb), `adapter_key`, `active`

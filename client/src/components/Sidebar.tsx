@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMyPoints } from "@/hooks/use-valorization";
 import {
   Home, Users, Gamepad2, User, Trophy, Puzzle,
-  Spline, BookOpen, Building2, BookMarked, Briefcase, Bus, HeartHandshake, MessageCircle, Shield, Compass,
+  Spline, BookOpen, Building2, BookMarked, Briefcase, Bus, HeartHandshake, MessageCircle, Shield, Compass, PenSquare,
 } from "lucide-react";
 import { CreatePostDialog } from "./CreatePostDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,6 +14,7 @@ const navItems = [
   { href: "/connect", label: "Peer Connect", icon: HeartHandshake },
   { href: "/groups", label: "Groups", icon: Users },
   { href: "/forums", label: "Forums", icon: MessageCircle },
+  { href: "/blogs", label: "Stories", icon: PenSquare },
   { href: "/spoons", label: "Spoon Tracker", icon: Spline },
   { href: "/journal", label: "Health Journal", icon: BookOpen },
   { href: "/providers", label: "Services", icon: Building2 },

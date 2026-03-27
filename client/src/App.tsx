@@ -36,6 +36,10 @@ import SafetyCentre from "@/pages/SafetyCentre";
 import TermsOfService from "@/pages/TermsOfService";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import AdminReports from "@/pages/AdminReports";
+import Blogs from "@/pages/Blogs";
+import BlogPost from "@/pages/BlogPost";
+import BlogWrite from "@/pages/BlogWrite";
+import BlogMy from "@/pages/BlogMy";
 
 function PrivateRoute({ component: Component, ...rest }: any) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -119,6 +123,11 @@ function Router() {
       <Route path="/terms" component={TermsOfService} />
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/admin/reports" component={props => <AdminRoute component={AdminReports} {...props} />} />
+      <Route path="/blogs/write" component={props => <PrivateRoute component={BlogWrite} {...props} />} />
+      <Route path="/blogs/edit/:id" component={props => <PrivateRoute component={BlogWrite} {...props} />} />
+      <Route path="/blogs/my" component={props => <PrivateRoute component={BlogMy} {...props} />} />
+      <Route path="/blogs/:slug" component={BlogPost} />
+      <Route path="/blogs" component={props => <PrivateRoute component={Blogs} {...props} />} />
       <Route component={NotFound} />
     </Switch>
   );

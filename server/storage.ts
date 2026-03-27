@@ -8,6 +8,7 @@ import {
   postReactions,
   forumCategories, forumThreads, forumReplies, forumVotes,
   venues, events, eventAttendees, userConnections, userServiceAffinities, participationJourneys,
+  blogPosts, blogComments, blogPostReactions,
   type User, type InsertUser,
   type Profile, type InsertProfile,
   type Group, type InsertGroup,
@@ -38,6 +39,9 @@ import {
   type UserConnection, type InsertUserConnection,
   type UserServiceAffinity, type InsertUserServiceAffinity,
   type ParticipationJourney, type InsertParticipationJourney,
+  type BlogPost, type InsertBlogPost,
+  type BlogComment, type InsertBlogComment,
+  type BlogPostReaction,
   POINT_VALUES
 } from "@shared/schema";
 
@@ -195,6 +199,22 @@ export interface IStorage {
     transportProviders: (TransportProvider & { compatibleVehicleCount: number })[];
     accessibilityWarnings: string[];
   }>;
+
+  // Blogs & Personal Stories
+  listBlogPosts(filters?: { tag?: string; status?: string; authorId?: string }): Promise<(BlogPost & { author: User; reactionCounts: Record<string, number> })[]>;
+  getBlogPost(slug: string): Promise<(BlogPost & { author: User; comments: (BlogComment & { author: User })[]; reactionCounts: Record<string, number> }) | undefined>;
+  getBlogPostById(id: number): Promise<BlogPost | undefined>;
+  createBlogPost(data: InsertBlogPost & { authorId: string }): Promise<BlogPost>;
+  updateBlogPost(id: number, authorId: string, data: Partial<InsertBlogPost>): Promise<BlogPost | undefined>;
+  deleteBlogPost(id: number, authorId: string): Promise<{ deleted: boolean; reason?: string }>;
+  publishBlogPost(id: number, authorId: string): Promise<BlogPost | undefined>;
+  unpublishBlogPost(id: number, authorId: string): Promise<BlogPost | undefined>;
+  addBlogComment(data: { blogPostId: number; authorId: string; content: string }): Promise<BlogComment>;
+  addBlogReaction(blogPostId: number, userId: string, reactionType: string): Promise<BlogPostReaction>;
+  removeBlogReaction(blogPostId: number, userId: string): Promise<void>;
+  getBlogReactionCounts(blogPostId: number): Promise<Record<string, number>>;
+  getUserBlogReaction(blogPostId: number, userId: string): Promise<BlogPostReaction | undefined>;
+  getUserDraftBlogPosts(authorId: string): Promise<BlogPost[]>;
 
   // Transport Module
   seedTransportProviders(): Promise<void>;
@@ -1652,6 +1672,150 @@ export class DatabaseStorage implements IStorage {
     transportProviders.sort((a, b) => b.compatibleVehicleCount - a.compatibleVehicleCount);
 
     return { event, venue, serviceProviders: matchedServices, transportProviders, accessibilityWarnings };
+  }
+
+  // === BLOGS & PERSONAL STORIES ===
+
+  async listBlogPosts(filters?: { tag?: string; status?: string; authorId?: string }): Promise<(BlogPost & { author: User; reactionCounts: Record<string, number> })[]> {
+    const conditions = [];
+    if (filters?.authorId) {
+      conditions.push(eq(blogPosts.authorId, filters.authorId));
+    } else {
+      conditions.push(eq(blogPosts.status, filters?.status || "published"));
+    }
+    const result = await db.query.blogPosts.findMany({
+      where: conditions.length === 1 ? conditions[0] : and(...conditions),
+      orderBy: [desc(blogPosts.publishedAt), desc(blogPosts.createdAt)],
+      with: { author: true },
+    });
+    let filtered = result;
+    if (filters?.tag) {
+      filtered = result.filter(p => (p.tags as string[])?.includes(filters.tag!));
+    }
+    // Fetch reaction counts for all posts in a single query
+    const postIds = filtered.map(p => p.id);
+    let reactionMap: Record<number, Record<string, number>> = {};
+    if (postIds.length > 0) {
+      const allReactions = await db.select().from(blogPostReactions).where(inArray(blogPostReactions.blogPostId, postIds));
+      for (const r of allReactions) {
+        if (!reactionMap[r.blogPostId]) reactionMap[r.blogPostId] = {};
+        reactionMap[r.blogPostId][r.reactionType] = (reactionMap[r.blogPostId][r.reactionType] || 0) + 1;
+      }
+    }
+    return filtered.map(p => ({ ...p, reactionCounts: reactionMap[p.id] || {} }));
+  }
+
+  async getBlogPost(slug: string): Promise<(BlogPost & { author: User; comments: (BlogComment & { author: User })[]; reactionCounts: Record<string, number> }) | undefined> {
+    const post = await db.query.blogPosts.findFirst({
+      where: eq(blogPosts.slug, slug),
+      with: {
+        author: true,
+        comments: {
+          with: { author: true },
+          orderBy: [desc(blogComments.createdAt)],
+        },
+      },
+    });
+    if (!post) return undefined;
+    const reactionCounts = await this.getBlogReactionCounts(post.id);
+    return { ...post, reactionCounts };
+  }
+
+  async getBlogPostById(id: number): Promise<BlogPost | undefined> {
+    const [post] = await db.select().from(blogPosts).where(eq(blogPosts.id, id));
+    return post;
+  }
+
+  async createBlogPost(data: InsertBlogPost & { authorId: string }): Promise<BlogPost> {
+    const [post] = await db.insert(blogPosts).values({
+      ...data,
+      updatedAt: new Date(),
+    }).returning();
+    return post;
+  }
+
+  async updateBlogPost(id: number, authorId: string, data: Partial<InsertBlogPost>): Promise<BlogPost | undefined> {
+    const existing = await this.getBlogPostById(id);
+    if (!existing || existing.authorId !== authorId) return undefined;
+    const [updated] = await db.update(blogPosts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(blogPosts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBlogPost(id: number, authorId: string): Promise<{ deleted: boolean; reason?: string }> {
+    const existing = await this.getBlogPostById(id);
+    if (!existing) return { deleted: false, reason: "not_found" };
+    if (existing.authorId !== authorId) return { deleted: false, reason: "forbidden" };
+    await db.delete(blogPosts).where(eq(blogPosts.id, id));
+    return { deleted: true };
+  }
+
+  async publishBlogPost(id: number, authorId: string): Promise<BlogPost | undefined> {
+    const existing = await this.getBlogPostById(id);
+    if (!existing || existing.authorId !== authorId) return undefined;
+    const [updated] = await db.update(blogPosts)
+      .set({ status: "published", publishedAt: new Date(), updatedAt: new Date() })
+      .where(eq(blogPosts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async unpublishBlogPost(id: number, authorId: string): Promise<BlogPost | undefined> {
+    const existing = await this.getBlogPostById(id);
+    if (!existing || existing.authorId !== authorId) return undefined;
+    const [updated] = await db.update(blogPosts)
+      .set({ status: "draft", updatedAt: new Date() })
+      .where(eq(blogPosts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async addBlogComment(data: { blogPostId: number; authorId: string; content: string }): Promise<BlogComment> {
+    const [comment] = await db.insert(blogComments).values(data).returning();
+    return comment;
+  }
+
+  async addBlogReaction(blogPostId: number, userId: string, reactionType: string): Promise<BlogPostReaction> {
+    const existing = await this.getUserBlogReaction(blogPostId, userId);
+    if (existing) {
+      const [updated] = await db.update(blogPostReactions)
+        .set({ reactionType })
+        .where(and(eq(blogPostReactions.blogPostId, blogPostId), eq(blogPostReactions.userId, userId)))
+        .returning();
+      return updated;
+    }
+    const [reaction] = await db.insert(blogPostReactions).values({ blogPostId, userId, reactionType }).returning();
+    return reaction;
+  }
+
+  async removeBlogReaction(blogPostId: number, userId: string): Promise<void> {
+    await db.delete(blogPostReactions).where(
+      and(eq(blogPostReactions.blogPostId, blogPostId), eq(blogPostReactions.userId, userId))
+    );
+  }
+
+  async getBlogReactionCounts(blogPostId: number): Promise<Record<string, number>> {
+    const reactions = await db.select().from(blogPostReactions).where(eq(blogPostReactions.blogPostId, blogPostId));
+    const counts: Record<string, number> = {};
+    for (const r of reactions) {
+      counts[r.reactionType] = (counts[r.reactionType] || 0) + 1;
+    }
+    return counts;
+  }
+
+  async getUserBlogReaction(blogPostId: number, userId: string): Promise<BlogPostReaction | undefined> {
+    const [reaction] = await db.select().from(blogPostReactions).where(
+      and(eq(blogPostReactions.blogPostId, blogPostId), eq(blogPostReactions.userId, userId))
+    );
+    return reaction;
+  }
+
+  async getUserDraftBlogPosts(authorId: string): Promise<BlogPost[]> {
+    return await db.select().from(blogPosts)
+      .where(and(eq(blogPosts.authorId, authorId), eq(blogPosts.status, "draft")))
+      .orderBy(desc(blogPosts.updatedAt));
   }
 
 }

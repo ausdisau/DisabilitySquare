@@ -1826,5 +1826,173 @@ export async function registerRoutes(
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
+  // === BLOGS & PERSONAL STORIES ===
+
+  // GET /api/blogs — list published blog posts (optional ?tag= filter)
+  app.get("/api/blogs", async (req: any, res) => {
+    try {
+      const tag = req.query.tag as string | undefined;
+      const posts = await storage.listBlogPosts({ tag });
+      res.json(posts);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // GET /api/blogs/my — current user's posts (all statuses)
+  app.get("/api/blogs/my", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const posts = await storage.listBlogPosts({ authorId: userId });
+      res.json(posts);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // GET /api/blogs/:slug — get single post by slug
+  app.get("/api/blogs/:slug", async (req: any, res) => {
+    try {
+      const requesterId = req.userId || req.oidc?.user?.sub;
+      const post = await storage.getBlogPost(req.params.slug);
+      if (!post) return res.status(404).json({ message: "Blog post not found" });
+      // Only author can see draft
+      if (post.status === "draft") {
+        if (!requesterId || requesterId !== post.authorId) {
+          return res.status(404).json({ message: "Blog post not found" });
+        }
+      }
+      const userReaction = requesterId ? await storage.getUserBlogReaction(post.id, requesterId) : undefined;
+      res.json({ ...post, userReaction: userReaction?.reactionType || null });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // POST /api/blogs — create a new blog post
+  app.post("/api/blogs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const schema = z.object({
+        title: z.string().min(1).max(200),
+        slug: z.string().min(1).max(200).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
+        content: z.string().min(1),
+        excerpt: z.string().optional(),
+        tags: z.array(z.string()).default([]),
+        status: z.enum(["draft", "published"]).default("draft"),
+      });
+      const input = schema.parse(req.body);
+      const post = await storage.createBlogPost({ ...input, authorId: userId });
+      if (input.status === "published") {
+        await storage.publishBlogPost(post.id, userId);
+      }
+      res.status(201).json(post);
+    } catch (e: any) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      if ((e as any)?.code === '23505') return res.status(409).json({ message: "A post with this slug already exists. Please choose a different title/slug." });
+      res.status(500).json({ message: e.message || "Internal server error" });
+    }
+  });
+
+  // PATCH /api/blogs/:id — update a blog post (author only)
+  app.patch("/api/blogs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const id = Number(req.params.id);
+      const schema = z.object({
+        title: z.string().min(1).max(200).optional(),
+        content: z.string().min(1).optional(),
+        excerpt: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        slug: z.string().min(1).max(200).regex(/^[a-z0-9-]+$/).optional(),
+      });
+      const input = schema.parse(req.body);
+      const post = await storage.updateBlogPost(id, userId, input);
+      if (!post) return res.status(404).json({ message: "Blog post not found or access denied" });
+      res.json(post);
+    } catch (e: any) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      res.status(500).json({ message: e.message || "Internal server error" });
+    }
+  });
+
+  // DELETE /api/blogs/:id — delete a blog post (author only)
+  app.delete("/api/blogs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const id = Number(req.params.id);
+      const result = await storage.deleteBlogPost(id, userId);
+      if (!result.deleted) {
+        if (result.reason === "not_found") return res.status(404).json({ message: "Blog post not found" });
+        if (result.reason === "forbidden") return res.status(403).json({ message: "You do not have permission to delete this post" });
+      }
+      res.json({ success: true });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "An error occurred";
+      res.status(500).json({ message: msg });
+    }
+  });
+
+  // POST /api/blogs/:id/publish — publish a draft post
+  app.post("/api/blogs/:id/publish", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const post = await storage.publishBlogPost(Number(req.params.id), userId);
+      if (!post) return res.status(404).json({ message: "Blog post not found or access denied" });
+      res.json(post);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // POST /api/blogs/:id/unpublish — unpublish a post back to draft
+  app.post("/api/blogs/:id/unpublish", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const post = await storage.unpublishBlogPost(Number(req.params.id), userId);
+      if (!post) return res.status(404).json({ message: "Blog post not found or access denied" });
+      res.json(post);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // POST /api/blogs/:id/comments — add a comment (post must be published)
+  app.post("/api/blogs/:id/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const blogPostId = Number(req.params.id);
+      const post = await storage.getBlogPostById(blogPostId);
+      if (!post) return res.status(404).json({ message: "Blog post not found" });
+      if (post.status !== "published") return res.status(403).json({ message: "Cannot comment on a draft post" });
+      const schema = z.object({ content: z.string().min(1).max(2000) });
+      const { content } = schema.parse(req.body);
+      const comment = await storage.addBlogComment({ blogPostId, authorId: userId, content });
+      res.status(201).json(comment);
+    } catch (e: any) {
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0].message });
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // POST /api/blogs/:id/react — add/update reaction (post must be published)
+  app.post("/api/blogs/:id/react", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const blogPostId = Number(req.params.id);
+      const post = await storage.getBlogPostById(blogPostId);
+      if (!post) return res.status(404).json({ message: "Blog post not found" });
+      if (post.status !== "published") return res.status(403).json({ message: "Cannot react to a draft post" });
+      const { reactionType } = req.body;
+      const validTypes = ['hug', 'me_too', 'helpful', 'inspiring'];
+      if (!validTypes.includes(reactionType)) return res.status(400).json({ message: "Invalid reaction type" });
+      const reaction = await storage.addBlogReaction(blogPostId, userId, reactionType);
+      res.json(reaction);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // DELETE /api/blogs/:id/react — remove reaction (post must be published)
+  app.delete("/api/blogs/:id/react", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.userId || req.oidc?.user?.sub;
+      const blogPostId = Number(req.params.id);
+      const post = await storage.getBlogPostById(blogPostId);
+      if (!post) return res.status(404).json({ message: "Blog post not found" });
+      if (post.status !== "published") return res.status(403).json({ message: "Cannot react to a draft post" });
+      await storage.removeBlogReaction(blogPostId, userId);
+      res.json({ success: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   return httpServer;
 }

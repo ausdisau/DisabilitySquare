@@ -59,6 +59,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   followers: many(userConnections, { relationName: "following" }),
   serviceAffinities: many(userServiceAffinities),
   participationJourneys: many(participationJourneys),
+  blogPosts: many(blogPosts),
+  blogComments: many(blogComments),
 }));
 
 // === GROUPS ===
@@ -371,6 +373,67 @@ export const EXTENSION_PERMISSIONS = {
   AWARD_BADGES: 'award:badges',
   SEND_NOTIFICATIONS: 'send:notifications',
 } as const;
+
+// === BLOGS & PERSONAL STORIES ===
+
+export const blogPosts = pgTable("blog_posts", {
+  id: serial("id").primaryKey(),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(),
+  content: text("content").notNull(),
+  excerpt: text("excerpt"),
+  status: text("status").notNull().default("draft"), // 'draft' | 'published'
+  tags: jsonb("tags").$type<string[]>().default([]),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const blogPostsRelations = relations(blogPosts, ({ one, many }) => ({
+  author: one(users, { fields: [blogPosts.authorId], references: [users.id] }),
+  comments: many(blogComments),
+  reactions: many(blogPostReactions),
+}));
+
+export const blogComments = pgTable("blog_comments", {
+  id: serial("id").primaryKey(),
+  blogPostId: integer("blog_post_id").notNull().references(() => blogPosts.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const blogCommentsRelations = relations(blogComments, ({ one }) => ({
+  blogPost: one(blogPosts, { fields: [blogComments.blogPostId], references: [blogPosts.id] }),
+  author: one(users, { fields: [blogComments.authorId], references: [users.id] }),
+}));
+
+export const blogPostReactions = pgTable("blog_post_reactions", {
+  id: serial("id").primaryKey(),
+  blogPostId: integer("blog_post_id").notNull().references(() => blogPosts.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  reactionType: text("reaction_type").notNull(), // 'hug' | 'me_too' | 'helpful' | 'inspiring'
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniqueUserBlogPost: unique("unique_blog_reaction").on(table.blogPostId, table.userId),
+}));
+
+export const blogPostReactionsRelations = relations(blogPostReactions, ({ one }) => ({
+  blogPost: one(blogPosts, { fields: [blogPostReactions.blogPostId], references: [blogPosts.id] }),
+  user: one(users, { fields: [blogPostReactions.userId], references: [users.id] }),
+}));
+
+export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({ id: true, authorId: true, createdAt: true, updatedAt: true, publishedAt: true });
+export const insertBlogCommentSchema = createInsertSchema(blogComments).omit({ id: true, authorId: true, createdAt: true });
+export const insertBlogPostReactionSchema = createInsertSchema(blogPostReactions).omit({ id: true, createdAt: true });
+
+export type BlogPost = typeof blogPosts.$inferSelect;
+export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
+export type BlogComment = typeof blogComments.$inferSelect;
+export type InsertBlogComment = z.infer<typeof insertBlogCommentSchema>;
+export type BlogPostReaction = typeof blogPostReactions.$inferSelect;
+export type InsertBlogPostReaction = z.infer<typeof insertBlogPostReactionSchema>;
 
 // === ZOD SCHEMAS ===
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, userId: true });
