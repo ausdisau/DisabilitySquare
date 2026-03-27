@@ -1,17 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "wouter";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Layout } from "@/components/Layout";
 import { SEO } from "@/components/SEO";
 import { formatDistanceToNow } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Form, FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import { ArrowUp, CheckCircle, ChevronLeft, Flag, Lightbulb, MessageSquare } from "lucide-react";
+import { ArrowUp, CheckCircle, ChevronLeft, Flag, Image, Lightbulb, MessageSquare, X } from "lucide-react";
 import type { ForumThread, ForumReply, ForumCategory } from "@shared/schema";
 import { ReportDialog } from "@/components/ReportDialog";
 
@@ -24,7 +29,24 @@ type ThreadDetail = ForumThread & {
   category?: ForumCategory;
 };
 
-function AuthorAvatar({ author, size = "sm" }: { author: { firstName: string | null; lastName: string | null; profileImageUrl: string | null }; size?: "sm" | "md" }) {
+type VoteBulkData = { votedIds: number[] };
+
+const replySchema = z.object({
+  body: z.string().min(1, "Reply cannot be empty"),
+  imageUrl0: z.string().url("Must be a valid URL").or(z.literal("")).optional(),
+  imageUrl1: z.string().url("Must be a valid URL").or(z.literal("")).optional(),
+  imageUrl2: z.string().url("Must be a valid URL").or(z.literal("")).optional(),
+  imageUrl3: z.string().url("Must be a valid URL").or(z.literal("")).optional(),
+});
+type ReplyFormValues = z.infer<typeof replySchema>;
+
+function AuthorAvatar({
+  author,
+  size = "sm",
+}: {
+  author: { firstName: string | null; lastName: string | null; profileImageUrl: string | null };
+  size?: "sm" | "md";
+}) {
   const initials = `${author.firstName?.[0] || ""}${author.lastName?.[0] || ""}`.toUpperCase();
   const sizeClass = size === "md" ? "h-10 w-10" : "h-8 w-8";
   return (
@@ -37,12 +59,147 @@ function AuthorAvatar({ author, size = "sm" }: { author: { firstName: string | n
   );
 }
 
+function ImageLightbox({ urls, onClose, startIndex }: { urls: string[]; onClose: () => void; startIndex: number }) {
+  const [current, setCurrent] = useState(startIndex);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      onClick={onClose}
+      data-testid="lightbox-overlay"
+    >
+      <div
+        className="relative max-w-3xl max-h-[90vh] flex flex-col items-center"
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute -top-10 right-0 text-white hover:text-white/70 transition-colors"
+          data-testid="button-lightbox-close"
+          aria-label="Close lightbox"
+        >
+          <X className="h-7 w-7" />
+        </button>
+        <img
+          src={urls[current]}
+          alt={`Image ${current + 1} of ${urls.length}`}
+          className="max-h-[80vh] max-w-full rounded-lg object-contain"
+          data-testid="lightbox-image"
+        />
+        {urls.length > 1 && (
+          <div className="flex items-center gap-3 mt-3">
+            {urls.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrent(i)}
+                data-testid={`button-lightbox-thumb-${i}`}
+                className={cn(
+                  "h-2 w-2 rounded-full transition-colors",
+                  i === current ? "bg-white" : "bg-white/40"
+                )}
+                aria-label={`Go to image ${i + 1}`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MediaGallery({ urls }: { urls: string[] }) {
+  const [lightboxOpen, setLightboxOpen] = useState<number | null>(null);
+  if (!urls || urls.length === 0) return null;
+  return (
+    <>
+      <div className="mt-3 flex gap-2 flex-wrap">
+        {urls.map((url, i) => (
+          <button
+            key={i}
+            onClick={() => setLightboxOpen(i)}
+            data-testid={`button-media-thumb-${i}`}
+            aria-label={`View image ${i + 1}`}
+            className="h-24 w-24 rounded-xl border border-border/50 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <img
+              src={url}
+              alt={`attachment ${i + 1}`}
+              className="h-full w-full object-cover"
+            />
+          </button>
+        ))}
+      </div>
+      {lightboxOpen !== null && (
+        <ImageLightbox
+          urls={urls}
+          startIndex={lightboxOpen}
+          onClose={() => setLightboxOpen(null)}
+        />
+      )}
+    </>
+  );
+}
+
+export function UpvoteButton({
+  entityType,
+  entityId,
+  count,
+  voted,
+  disabled,
+  onVote,
+}: {
+  entityType: "thread" | "reply";
+  entityId: number;
+  count: number;
+  voted: boolean;
+  disabled?: boolean;
+  onVote: () => void;
+}) {
+  return (
+    <button
+      onClick={onVote}
+      disabled={disabled}
+      data-testid={`button-vote-${entityType}-${entityId}`}
+      aria-label={`${voted ? "Remove upvote" : "Upvote"} (${count})`}
+      className={cn(
+        "flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors",
+        voted
+          ? "text-accent font-bold bg-accent/10"
+          : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+      )}
+    >
+      <ArrowUp className="h-3.5 w-3.5" />
+      {count}
+    </button>
+  );
+}
+
+export function AcceptAnswerButton({
+  replyId,
+  onAccept,
+}: {
+  replyId: number;
+  onAccept: () => void;
+}) {
+  return (
+    <button
+      onClick={onAccept}
+      data-testid={`button-accept-reply-${replyId}`}
+      className="flex items-center gap-1 text-xs text-[#2A9D8F] font-medium px-2 py-1 rounded-full hover:bg-[#2A9D8F]/10 transition-colors"
+    >
+      <CheckCircle className="h-3.5 w-3.5" />
+      Mark as Answer
+    </button>
+  );
+}
+
 function ReplyCard({
   reply,
   isThreadAuthor,
   isAdviceRequest,
+  hasAcceptedAnswer,
   userVotedReplyIds,
   currentUserId,
+  votePending,
   onVote,
   onAccept,
 }: {
@@ -50,8 +207,10 @@ function ReplyCard({
   threadId: number;
   isThreadAuthor: boolean;
   isAdviceRequest: boolean;
+  hasAcceptedAnswer: boolean;
   userVotedReplyIds: number[];
   currentUserId?: string;
+  votePending?: boolean;
   onVote: (replyId: number) => void;
   onAccept: (replyId: number) => void;
 }) {
@@ -86,36 +245,19 @@ function ReplyCard({
             </div>
             <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{reply.body}</p>
             {reply.mediaUrls && reply.mediaUrls.length > 0 && (
-              <div className="mt-2 flex gap-2 flex-wrap">
-                {reply.mediaUrls.map((url, i) => (
-                  <img key={i} src={url} alt={`attachment ${i + 1}`} className="h-24 w-24 object-cover rounded-xl border border-border/50" />
-                ))}
-              </div>
+              <MediaGallery urls={reply.mediaUrls} />
             )}
             <div className="flex items-center gap-2 mt-3 -ml-1">
-              <button
-                onClick={() => onVote(reply.id)}
-                data-testid={`button-vote-reply-${reply.id}`}
-                aria-label={`${voted ? "Remove upvote" : "Upvote"} (${reply.upvotesCount})`}
-                className={cn(
-                  "flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors",
-                  voted
-                    ? "text-accent font-bold bg-accent/10"
-                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                )}
-              >
-                <ArrowUp className="h-3.5 w-3.5" />
-                {reply.upvotesCount}
-              </button>
-              {isThreadAuthor && isAdviceRequest && !reply.isAcceptedAnswer && (
-                <button
-                  onClick={() => onAccept(reply.id)}
-                  data-testid={`button-accept-reply-${reply.id}`}
-                  className="flex items-center gap-1 text-xs text-[#2A9D8F] hover:text-[#228177] font-medium px-2 py-1 rounded-full hover:bg-[#2A9D8F]/10 transition-colors"
-                >
-                  <CheckCircle className="h-3.5 w-3.5" />
-                  Mark as Answer
-                </button>
+              <UpvoteButton
+                entityType="reply"
+                entityId={reply.id}
+                count={reply.upvotesCount}
+                voted={voted}
+                disabled={votePending}
+                onVote={() => onVote(reply.id)}
+              />
+              {isThreadAuthor && isAdviceRequest && !hasAcceptedAnswer && !reply.isAcceptedAnswer && (
+                <AcceptAnswerButton replyId={reply.id} onAccept={() => onAccept(reply.id)} />
               )}
               {canReport && (
                 <button
@@ -146,20 +288,150 @@ function ReplyCard({
   );
 }
 
+function ReplyComposer({ threadId, onSuccess }: { threadId: string; onSuccess: () => void }) {
+  const { toast } = useToast();
+  const [showImageFields, setShowImageFields] = useState(false);
+
+  const form = useForm<ReplyFormValues>({
+    resolver: zodResolver(replySchema),
+    defaultValues: {
+      body: "",
+      imageUrl0: "",
+      imageUrl1: "",
+      imageUrl2: "",
+      imageUrl3: "",
+    },
+  });
+
+  const replyMutation = useMutation({
+    mutationFn: (values: ReplyFormValues) => {
+      const mediaUrls = [values.imageUrl0, values.imageUrl1, values.imageUrl2, values.imageUrl3]
+        .filter((u): u is string => !!u && u.trim() !== "");
+      return apiRequest("POST", `/api/forums/threads/${threadId}/replies`, {
+        body: values.body,
+        mediaUrls,
+      });
+    },
+    onSuccess: () => {
+      form.reset();
+      setShowImageFields(false);
+      onSuccess();
+      toast({ title: "Reply posted!" });
+    },
+    onError: () => toast({ title: "Failed to post reply", variant: "destructive" }),
+  });
+
+  return (
+    <div className="sm-card">
+      <div className="sm-card-title">
+        <MessageSquare className="h-4 w-4 text-primary" />
+        Leave a reply
+      </div>
+      <div className="sm-card-body pt-2">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(v => replyMutation.mutate(v))} className="space-y-3">
+            <FormField
+              control={form.control}
+              name="body"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      placeholder="Share your thoughts, experience, or advice..."
+                      rows={4}
+                      className="text-sm resize-none"
+                      data-testid="input-reply-body"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {showImageFields && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                  <Image className="h-3 w-3" />
+                  Image URLs (up to 4)
+                </p>
+                {([0, 1, 2, 3] as const).map(i => (
+                  <FormField
+                    key={i}
+                    control={form.control}
+                    name={`imageUrl${i}` as "imageUrl0" | "imageUrl1" | "imageUrl2" | "imageUrl3"}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder={`Image URL ${i + 1} (optional)`}
+                            className="text-xs h-8"
+                            data-testid={`input-image-url-${i}`}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowImageFields(v => !v)}
+                  data-testid="button-toggle-image-fields"
+                  className={cn(
+                    "flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors",
+                    showImageFields
+                      ? "text-primary bg-primary/10 font-medium"
+                      : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  )}
+                >
+                  <Image className="h-3 w-3" />
+                  {showImageFields ? "Hide image fields" : "Add images"}
+                </button>
+                <p className="text-xs text-muted-foreground hidden sm:block">
+                  Thoughtful replies (100+ chars) earn bonus points.
+                </p>
+              </div>
+              <Button
+                type="submit"
+                disabled={replyMutation.isPending || !form.watch("body").trim()}
+                className="text-xs h-9 px-5 rounded-full bg-primary"
+                data-testid="button-submit-reply"
+              >
+                {replyMutation.isPending ? "Posting…" : "Post Reply"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </div>
+    </div>
+  );
+}
+
 export default function ForumThreadPage() {
   const { slug, threadId } = useParams<{ slug: string; threadId: string }>();
   const { user } = useAuth();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [replyBody, setReplyBody] = useState("");
+  const { toast } = useToast();
 
   const { data: thread, isLoading } = useQuery<ThreadDetail>({
     queryKey: [`/api/forums/threads/${threadId}`],
     enabled: !!threadId,
   });
 
+  const { data: category } = useQuery<ForumCategory>({
+    queryKey: [`/api/forums/categories/${slug}`],
+    enabled: !!slug,
+  });
+
   const replyIds = thread?.replies.map(r => r.id) || [];
-  const { data: votesData } = useQuery<{ votedIds: number[] }>({
+  const { data: votesData } = useQuery<VoteBulkData>({
     queryKey: [`/api/forums/votes/bulk-replies`, threadId],
     enabled: replyIds.length > 0,
     queryFn: async () => {
@@ -174,7 +446,7 @@ export default function ForumThreadPage() {
   });
   const userVotedReplyIds = votesData?.votedIds || [];
 
-  const { data: threadVotesData } = useQuery<{ votedIds: number[] }>({
+  const { data: threadVotesData } = useQuery<VoteBulkData>({
     queryKey: [`/api/forums/votes/bulk-thread-single`, threadId],
     enabled: !!threadId,
     queryFn: async () => {
@@ -189,42 +461,126 @@ export default function ForumThreadPage() {
   });
   const userVotedThread = threadVotesData?.votedIds?.includes(parseInt(threadId!)) ?? false;
 
-  const replyMutation = useMutation({
-    mutationFn: () => apiRequest("POST", `/api/forums/threads/${threadId}/replies`, { body: replyBody }),
-    onSuccess: () => {
-      setReplyBody("");
-      queryClient.invalidateQueries({ queryKey: [`/api/forums/threads/${threadId}`] });
-      toast({ title: "Reply posted!" });
-    },
-    onError: () => toast({ title: "Failed to post reply", variant: "destructive" }),
-  });
-
   const voteMutation = useMutation({
-    mutationFn: ({ entityType, entityId }: { entityType: string; entityId: number }) =>
+    mutationFn: ({ entityType, entityId }: { entityType: "thread" | "reply"; entityId: number }) =>
       apiRequest("POST", `/api/forums/${entityType === "thread" ? "threads" : "replies"}/${entityId}/vote`),
-    onSuccess: () => {
+
+    onMutate: async ({ entityType, entityId }) => {
+      if (entityType === "thread") {
+        await queryClient.cancelQueries({ queryKey: [`/api/forums/votes/bulk-thread-single`, threadId] });
+        const prevVotes = queryClient.getQueryData<VoteBulkData>([`/api/forums/votes/bulk-thread-single`, threadId]);
+        const prevThread = queryClient.getQueryData<ThreadDetail>([`/api/forums/threads/${threadId}`]);
+
+        queryClient.setQueryData<VoteBulkData>([`/api/forums/votes/bulk-thread-single`, threadId], old => {
+          const ids = old?.votedIds || [];
+          return { votedIds: ids.includes(entityId) ? ids.filter(i => i !== entityId) : [...ids, entityId] };
+        });
+        queryClient.setQueryData<ThreadDetail>([`/api/forums/threads/${threadId}`], old => {
+          if (!old) return old;
+          const wasVoted = prevVotes?.votedIds?.includes(entityId);
+          return { ...old, upvotesCount: old.upvotesCount + (wasVoted ? -1 : 1) };
+        });
+
+        return { prevVotes, prevThread, entityType };
+      } else {
+        await queryClient.cancelQueries({ queryKey: [`/api/forums/votes/bulk-replies`, threadId] });
+        const prevVotes = queryClient.getQueryData<VoteBulkData>([`/api/forums/votes/bulk-replies`, threadId]);
+        const prevThread = queryClient.getQueryData<ThreadDetail>([`/api/forums/threads/${threadId}`]);
+
+        queryClient.setQueryData<VoteBulkData>([`/api/forums/votes/bulk-replies`, threadId], old => {
+          const ids = old?.votedIds || [];
+          return { votedIds: ids.includes(entityId) ? ids.filter(i => i !== entityId) : [...ids, entityId] };
+        });
+        queryClient.setQueryData<ThreadDetail>([`/api/forums/threads/${threadId}`], old => {
+          if (!old) return old;
+          const wasVoted = prevVotes?.votedIds?.includes(entityId);
+          return {
+            ...old,
+            replies: old.replies.map(r =>
+              r.id === entityId ? { ...r, upvotesCount: r.upvotesCount + (wasVoted ? -1 : 1) } : r
+            ),
+          };
+        });
+
+        return { prevVotes, prevThread, entityType };
+      }
+    },
+
+    onError: (_err, { entityType }, context) => {
+      if (!context) return;
+      if (entityType === "thread") {
+        if (context.prevVotes) queryClient.setQueryData([`/api/forums/votes/bulk-thread-single`, threadId], context.prevVotes);
+        if (context.prevThread) queryClient.setQueryData([`/api/forums/threads/${threadId}`], context.prevThread);
+      } else {
+        if (context.prevVotes) queryClient.setQueryData([`/api/forums/votes/bulk-replies`, threadId], context.prevVotes);
+        if (context.prevThread) queryClient.setQueryData([`/api/forums/threads/${threadId}`], context.prevThread);
+      }
+    },
+
+    onSettled: (_data, _err, { entityType }) => {
       queryClient.invalidateQueries({ queryKey: [`/api/forums/threads/${threadId}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/forums/votes/bulk-replies`, threadId] });
-      queryClient.invalidateQueries({ queryKey: [`/api/forums/votes/bulk-thread-single`, threadId] });
+      if (entityType === "thread") {
+        queryClient.invalidateQueries({ queryKey: [`/api/forums/votes/bulk-thread-single`, threadId] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: [`/api/forums/votes/bulk-replies`, threadId] });
+      }
     },
   });
 
   const acceptMutation = useMutation({
-    mutationFn: (replyId: number) => apiRequest("POST", `/api/forums/replies/${replyId}/accept`, { threadId: parseInt(threadId!) }),
+    mutationFn: (replyId: number) =>
+      apiRequest("POST", `/api/forums/replies/${replyId}/accept`, { threadId: parseInt(threadId!) }),
+
+    onMutate: async (replyId: number) => {
+      await queryClient.cancelQueries({ queryKey: [`/api/forums/threads/${threadId}`] });
+      const prevThread = queryClient.getQueryData<ThreadDetail>([`/api/forums/threads/${threadId}`]);
+
+      queryClient.setQueryData<ThreadDetail>([`/api/forums/threads/${threadId}`], old => {
+        if (!old) return old;
+        return {
+          ...old,
+          isSolved: true,
+          replies: old.replies.map(r =>
+            r.id === replyId ? { ...r, isAcceptedAnswer: true } : { ...r, isAcceptedAnswer: false }
+          ),
+        };
+      });
+
+      return { prevThread };
+    },
+
+    onError: (_err, _replyId, context) => {
+      if (context?.prevThread) {
+        queryClient.setQueryData([`/api/forums/threads/${threadId}`], context.prevThread);
+      }
+      toast({ title: "Failed to mark answer", variant: "destructive" });
+    },
+
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/forums/threads/${threadId}`] });
       toast({ title: "Answer accepted!" });
     },
-    onError: (e: any) => toast({ title: e?.message || "Failed to mark answer", variant: "destructive" }),
+
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/forums/threads/${threadId}`] });
+    },
   });
 
   const isThreadAuthor = !!user && thread?.authorId === user.id;
-  const authorName = thread ? `${thread.author.firstName || "Member"} ${thread.author.lastName || ""}`.trim() : "";
+  const authorName = thread
+    ? `${thread.author.firstName || "Member"} ${thread.author.lastName || ""}`.trim()
+    : "";
   const [threadReportOpen, setThreadReportOpen] = useState(false);
   const canReportThread = !!user && thread && !!thread.author.id;
 
   const acceptedReplies = thread?.replies.filter(r => r.isAcceptedAnswer) || [];
   const otherReplies = thread?.replies.filter(r => !r.isAcceptedAnswer) || [];
+  const hasAcceptedAnswer = acceptedReplies.length > 0;
+
+  const categoryDisplayName = category?.name || slug;
+
+  const handleReplySuccess = () => {
+    queryClient.invalidateQueries({ queryKey: [`/api/forums/threads/${threadId}`] });
+  };
 
   return (
     <Layout>
@@ -235,14 +591,13 @@ export default function ForumThreadPage() {
 
       <div className="max-w-2xl">
         <nav className="flex items-center gap-2 mb-4 text-xs" aria-label="Breadcrumb">
-          <Link href="/forums">
-            <span className="text-primary hover:text-primary/80 cursor-pointer flex items-center gap-1 font-medium">
-              <ChevronLeft className="h-3.5 w-3.5" />Forums
-            </span>
-          </Link>
-          <span className="text-muted-foreground">/</span>
           <Link href={`/forums/${slug}`}>
-            <span className="text-primary hover:text-primary/80 cursor-pointer font-medium">{slug}</span>
+            <span
+              className="text-primary hover:text-primary/80 cursor-pointer flex items-center gap-1 font-medium"
+              data-testid="link-back-to-category"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />Back to {categoryDisplayName}
+            </span>
           </Link>
           <span className="text-muted-foreground">/</span>
           <span className="text-muted-foreground truncate max-w-[160px]">{thread?.title || "Thread"}</span>
@@ -260,6 +615,17 @@ export default function ForumThreadPage() {
                 </div>
               </div>
             </div>
+            {[1, 2].map(i => (
+              <div key={i} className="sm-post animate-pulse p-4">
+                <div className="flex gap-3">
+                  <div className="h-8 w-8 rounded-full bg-muted shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-muted rounded-full w-1/5" />
+                    <div className="h-10 bg-muted rounded-xl" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : thread ? (
           <div className="space-y-3">
@@ -293,12 +659,9 @@ export default function ForumThreadPage() {
                     <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{thread.body}</p>
 
                     {thread.mediaUrls && thread.mediaUrls.length > 0 && (
-                      <div className="mt-3 flex gap-2 flex-wrap">
-                        {thread.mediaUrls.map((url, i) => (
-                          <img key={i} src={url} alt={`attachment ${i + 1}`} className="h-32 w-32 object-cover rounded-xl border border-border/50" />
-                        ))}
-                      </div>
+                      <MediaGallery urls={thread.mediaUrls} />
                     )}
+
                     {thread.tags && Array.isArray(thread.tags) && (thread.tags as string[]).length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {(thread.tags as string[]).map(tag => (
@@ -308,21 +671,14 @@ export default function ForumThreadPage() {
                     )}
 
                     <div className="flex items-center gap-3 mt-3 -ml-1">
-                      <button
-                        onClick={() => voteMutation.mutate({ entityType: "thread", entityId: thread.id })}
+                      <UpvoteButton
+                        entityType="thread"
+                        entityId={thread.id}
+                        count={thread.upvotesCount}
+                        voted={userVotedThread}
                         disabled={voteMutation.isPending || !user}
-                        data-testid={`button-vote-thread-${thread.id}`}
-                        aria-label={`${userVotedThread ? "Remove upvote" : "Upvote"} (${thread.upvotesCount})`}
-                        className={cn(
-                          "flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors",
-                          userVotedThread
-                            ? "text-accent font-bold bg-accent/10"
-                            : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                        )}
-                      >
-                        <ArrowUp className="h-3.5 w-3.5" />
-                        {thread.upvotesCount} upvote{thread.upvotesCount !== 1 ? "s" : ""}
-                      </button>
+                        onVote={() => voteMutation.mutate({ entityType: "thread", entityId: thread.id })}
+                      />
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <MessageSquare className="h-3.5 w-3.5" />
                         {thread.replyCount} repl{thread.replyCount !== 1 ? "ies" : "y"}
@@ -363,8 +719,10 @@ export default function ForumThreadPage() {
                 threadId={thread.id}
                 isThreadAuthor={isThreadAuthor}
                 isAdviceRequest={thread.isAdviceRequest}
+                hasAcceptedAnswer={hasAcceptedAnswer}
                 userVotedReplyIds={userVotedReplyIds}
                 currentUserId={user?.id}
+                votePending={voteMutation.isPending || !user}
                 onVote={id => voteMutation.mutate({ entityType: "reply", entityId: id })}
                 onAccept={id => acceptMutation.mutate(id)}
               />
@@ -386,44 +744,26 @@ export default function ForumThreadPage() {
                 threadId={thread.id}
                 isThreadAuthor={isThreadAuthor}
                 isAdviceRequest={thread.isAdviceRequest}
+                hasAcceptedAnswer={hasAcceptedAnswer}
                 userVotedReplyIds={userVotedReplyIds}
                 currentUserId={user?.id}
+                votePending={voteMutation.isPending || !user}
                 onVote={id => voteMutation.mutate({ entityType: "reply", entityId: id })}
                 onAccept={id => acceptMutation.mutate(id)}
               />
             ))}
 
-            {/* Reply composer */}
-            {user ? (
+            {otherReplies.length === 0 && acceptedReplies.length === 0 && (
               <div className="sm-card">
-                <div className="sm-card-title">
-                  <MessageSquare className="h-4 w-4 text-primary" />
-                  Leave a reply
-                </div>
-                <div className="sm-card-body pt-2">
-                  <Textarea
-                    value={replyBody}
-                    onChange={e => setReplyBody(e.target.value)}
-                    placeholder="Share your thoughts, experience, or advice..."
-                    rows={4}
-                    className="text-sm mb-3 resize-none"
-                    data-testid="input-reply-body"
-                  />
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      Thoughtful replies (100+ chars) earn bonus points.
-                    </p>
-                    <Button
-                      onClick={() => replyMutation.mutate()}
-                      disabled={replyMutation.isPending || !replyBody.trim()}
-                      className="text-xs h-9 px-5 rounded-full bg-primary hover:bg-primary/90"
-                      data-testid="button-submit-reply"
-                    >
-                      {replyMutation.isPending ? "Posting…" : "Post Reply"}
-                    </Button>
-                  </div>
+                <div className="sm-card-body text-center py-6">
+                  <p className="text-sm text-muted-foreground">No replies yet. Be the first to respond!</p>
                 </div>
               </div>
+            )}
+
+            {/* Reply composer */}
+            {user ? (
+              <ReplyComposer threadId={threadId!} onSuccess={handleReplySuccess} />
             ) : (
               <div className="sm-card">
                 <div className="sm-card-body text-center py-6">
