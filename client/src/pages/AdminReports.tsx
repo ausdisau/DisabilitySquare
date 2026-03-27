@@ -14,12 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ShieldAlert, AlertTriangle, CheckCircle2, Clock, Ban, RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -152,17 +146,17 @@ export default function AdminReports() {
               const isUnderage = report.esafetyScheme === "underage";
 
               return (
-                <Card
+                <div
                   key={report.id}
-                  className={`border ${isUnderage ? "border-orange-300 dark:border-orange-700 bg-orange-50/40 dark:bg-orange-950/20" : "border-border"}`}
+                  className={`sm-card ${isUnderage ? "border-orange-300 dark:border-orange-700 bg-orange-50/40 dark:bg-orange-950/20" : ""}`}
                   data-testid={`card-report-${report.id}`}
                 >
-                  <CardHeader className="pb-3">
+                  <div className="sm-card-title">
                     <div className="flex items-start justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <CardTitle className="text-sm font-semibold">
+                        <span className="text-sm font-semibold">
                           Report #{report.id}
-                        </CardTitle>
+                        </span>
                         <Badge variant={statusInfo.variant} className="flex items-center gap-1 text-[11px]">
                           <StatusIcon className="h-3 w-3" />
                           {statusInfo.label}
@@ -178,8 +172,8 @@ export default function AdminReports() {
                         {formatDistanceToNow(new Date(report.createdAt || new Date()), { addSuffix: true })}
                       </span>
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
+                  </div>
+                  <div className="sm-card-body space-y-3">
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
                         <span className="text-muted-foreground">Content Type:</span>{" "}
@@ -263,8 +257,8 @@ export default function AdminReports() {
                         </Button>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               );
             })}
           </div>

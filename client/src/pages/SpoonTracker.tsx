@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { SEO } from "@/components/SEO";
@@ -94,18 +93,18 @@ export default function SpoonTracker() {
   return (
     <Layout>
       <SEO title="Spoon Tracker - DisabilitySquare" description="Track your daily energy using spoon theory" />
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-2xl space-y-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Spoon Tracker</h1>
-          <p className="text-muted-foreground mt-1">Track your daily energy using spoon theory</p>
+          <h1 className="text-xl font-bold text-foreground">Spoon Tracker</h1>
+          <p className="text-sm text-muted-foreground mt-1">Track your daily energy using spoon theory</p>
         </div>
 
-        <Card className="border-border">
-          <CardHeader className="pb-2">
+        <div className="sm-card">
+          <div className="sm-card-body">
             <div className="flex items-start gap-3">
               <Info className="h-5 w-5 text-primary mt-0.5 shrink-0" aria-hidden="true" />
               <div>
-                <CardTitle className="text-base">What is spoon theory?</CardTitle>
+                <p className="text-sm font-semibold text-foreground">What is spoon theory?</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   Spoon theory is a metaphor for the limited energy available to people with chronic illness or disability.
                   Each "spoon" represents a unit of energy. You start each day with a certain number of spoons and every
@@ -113,15 +112,15 @@ export default function SpoonTracker() {
                 </p>
               </div>
             </div>
-          </CardHeader>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>How many spoons do you have today?</CardTitle>
-            <p className="text-sm text-muted-foreground">{formatDate(today)}</p>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        <div className="sm-card">
+          <div className="sm-card-title">
+            <Spline className="h-4 w-4" aria-hidden="true" />
+            How many spoons today? — {formatDate(today)}
+          </div>
+          <div className="sm-card-body space-y-6">
             <div
               className="grid grid-cols-6 gap-2"
               role="radiogroup"
@@ -185,44 +184,42 @@ export default function SpoonTracker() {
             >
               {todayStatus ? "Update Today's Spoons" : "Save Today's Spoons"}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card className="text-center">
-            <CardContent className="pt-6">
+          <div className="sm-card text-center">
+            <div className="sm-card-body py-5">
               <p className="text-3xl font-bold text-primary" data-testid="text-today-spoons">
                 {todayStatus ? todayStatus.spoons : "—"}
               </p>
               <p className="text-sm text-muted-foreground mt-1">Today</p>
-            </CardContent>
-          </Card>
-          <Card className="text-center">
-            <CardContent className="pt-6">
+            </div>
+          </div>
+          <div className="sm-card text-center">
+            <div className="sm-card-body py-5">
               <p className="text-3xl font-bold text-accent" data-testid="text-avg-spoons">
                 {avgSpoons ?? "—"}
               </p>
               <p className="text-sm text-muted-foreground mt-1">30-Day Average</p>
-            </CardContent>
-          </Card>
-          <Card className="text-center">
-            <CardContent className="pt-6">
+            </div>
+          </div>
+          <div className="sm-card text-center">
+            <div className="sm-card-body py-5">
               <p className="text-3xl font-bold text-secondary" data-testid="text-streak-spoons">
                 {history.length}
               </p>
               <p className="text-sm text-muted-foreground mt-1">Days Tracked</p>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" aria-hidden="true" />
-              Last 14 Days
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="sm-card">
+          <div className="sm-card-title">
+            <TrendingUp className="h-4 w-4" aria-hidden="true" />
+            Last 14 Days
+          </div>
+          <div className="sm-card-body">
             <div className="flex items-end gap-1 h-32" aria-label="Spoon history chart">
               {last14.map(date => {
                 const spoons = spoonsByDate[date];

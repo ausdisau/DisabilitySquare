@@ -35,8 +35,18 @@ The UI/UX is designed with a 2004-era social network aesthetic, featuring a fixe
     - **Daily Wellness Check-In**: Quick mood check-in with streak tracking.
 - **Community Forums**: Structured bulletin board with 8 categories, thread types (General, Advice Request), upvoting, accepted answers, and valorization points for participation.
 
+- **Discover & Participate**: Personalised social graph with people suggestions, matched services, accessible events with venue accessibility metadata, and a 5-step Participation Journey wizard (activity → support needs → service provider → accessible transport → confirm).
+- **Admin eSafety Reports**: Moderation dashboard for reviewing eSafety reports with scheme classification, status workflow, and user deactivation.
+
+### CSS Design System
+All pages use `sm-*` CSS tokens defined in `index.css` — never use shadcn `Card`/`CardContent`/`CardHeader`/`CardTitle` for page-level layouts. Key tokens: `sm-card`, `sm-card-title`, `sm-card-body`, `sm-post` (left accent border), `sm-nav-link`, `sm-profile-panel` (navy gradient identity card at top of sidebar), `sm-topbar`.
+
 ### Database Schema
-Key tables include `users`, `profiles`, `groups`, `posts`, `comments`, `gameScores`, `badges`, `user_badges`, `points_ledger`, `user_points`, `transport_providers`, `transport_vehicles`, `trip_quotes`, `trips`, `post_reactions`, `forum_categories`, `forum_threads`, `forum_replies`, and `forum_votes`.
+Key tables include `users`, `profiles`, `groups`, `posts`, `comments`, `gameScores`, `badges`, `user_badges`, `points_ledger`, `user_points`, `transport_providers`, `transport_vehicles`, `trip_quotes`, `trips`, `post_reactions`, `forum_categories`, `forum_threads`, `forum_replies`, `forum_votes`, `venues`, `events`, `event_attendees`, `user_connections`, `user_service_affinities`, and `participation_journeys`.
+
+### DB Column Notes
+- `transport_providers` table: uses `kind` column (not `type`), has `ndis_support`, `rate_card` (jsonb), `adapter_key`, `active`
+- New tables (venues, events, event_attendees, user_connections, user_service_affinities, participation_journeys) created via direct SQL (drizzle push is interactive)
 
 ## External Dependencies
 - **Auth0**: For user authentication.

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -175,8 +174,8 @@ function PeoplePanel() {
         const name = [person.firstName, person.lastName].filter(Boolean).join(" ") || "Community Member";
         const initials = [person.firstName?.[0], person.lastName?.[0]].filter(Boolean).join("").toUpperCase() || "?";
         return (
-          <Card key={person.id} data-testid={`card-person-${person.id}`} className="flex flex-col">
-            <CardContent className="pt-4 flex-1">
+          <div className="sm-card flex flex-col" key={person.id} data-testid={`card-person-${person.id}`}>
+            <div className="sm-card-body flex-1">
               <div className="flex items-start gap-3">
                 <Avatar className="h-11 w-11 shrink-0">
                   <AvatarImage src={person.profileImageUrl || undefined} />
@@ -220,8 +219,8 @@ function PeoplePanel() {
                   <><UserPlus className="h-3.5 w-3.5 mr-1" />Connect</>
                 )}
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         );
       })}
     </div>
@@ -273,8 +272,8 @@ function ServicesPanel() {
       {services.map((provider) => {
         const isSaved = savedIds.has(provider.id);
         return (
-          <Card key={provider.id} data-testid={`card-service-${provider.id}`} className="flex flex-col">
-            <CardContent className="pt-4 flex-1">
+          <div className="sm-card flex flex-col" key={provider.id} data-testid={`card-service-${provider.id}`}>
+            <div className="sm-card-body flex-1">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="font-semibold text-sm leading-snug" data-testid={`text-service-name-${provider.id}`}>{provider.name}</p>
@@ -304,8 +303,8 @@ function ServicesPanel() {
                   <><Star className="h-3.5 w-3.5 mr-1" />Save Provider</>
                 )}
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         );
       })}
     </div>
@@ -360,8 +359,8 @@ function EventsPanel({ onPlanJourney }: { onPlanJourney: (eventId: number) => vo
         const myRsvp = rsvpMap[event.id];
         const features = event.venue?.accessibilityFeatures as string[] | undefined;
         return (
-          <Card key={event.id} data-testid={`card-event-${event.id}`}>
-            <CardContent className="pt-4">
+          <div className="sm-card" key={event.id} data-testid={`card-event-${event.id}`}>
+            <div className="sm-card-body">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -432,8 +431,8 @@ function EventsPanel({ onPlanJourney }: { onPlanJourney: (eventId: number) => vo
                   <Route className="h-3.5 w-3.5 mr-1" />Plan Journey
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         );
       })}
     </div>
@@ -522,13 +521,13 @@ function JourneyWizard({
   const hasTransportNeed = selectedSupportNeeds.includes("transport");
 
   return (
-    <Card className="mt-2" data-testid="card-journey-wizard">
-      <CardHeader className="pb-2">
+    <div className="sm-card mt-2" data-testid="card-journey-wizard">
+      <div className="px-4 pt-3 pb-2 border-b border-border/60 bg-primary/5">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base">{STEP_TITLES[step]}</CardTitle>
+          <p className="font-semibold text-sm text-primary">{STEP_TITLES[step]}</p>
           <Button variant="ghost" size="sm" onClick={onClose} data-testid="button-close-wizard">Close</Button>
         </div>
-        <div className="flex gap-1 mt-1">
+        <div className="flex gap-1 mt-2">
           {WIZARD_STEP_ORDER.map((s) => (
             <div
               key={s}
@@ -540,8 +539,8 @@ function JourneyWizard({
             />
           ))}
         </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="sm-card-body">
         {step === "select-event" && (
           <div className="space-y-2">
             {eventsLoading ? (
@@ -812,8 +811,8 @@ function JourneyWizard({
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -867,8 +866,8 @@ function JourneyPanel({ initialEventId, onEventConsumed }: { initialEventId?: nu
       ) : (
         <div className="grid gap-3 mt-4">
           {journeys.map((journey) => (
-            <Card key={journey.id} data-testid={`card-journey-${journey.id}`}>
-              <CardContent className="pt-4">
+            <div className="sm-card" key={journey.id} data-testid={`card-journey-${journey.id}`}>
+              <div className="sm-card-body">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-semibold text-sm">{journey.event?.title || "Event"}</p>
@@ -903,8 +902,8 @@ function JourneyPanel({ initialEventId, onEventConsumed }: { initialEventId?: nu
                     {journey.status}
                   </Badge>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -924,13 +923,13 @@ export default function Discover() {
   return (
     <Layout>
       <SEO
-        title="Discover & Participate | MapAble"
-        description="Find people, services, events and plan your participation journey in the MapAble community."
+        title="Discover & Participate — DisabilitySquare"
+        description="Find people, services, events and plan your participation journey in the DisabilitySquare community."
       />
-      <div className="max-w-3xl mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold" data-testid="text-discover-heading">Discover & Participate</h1>
-          <p className="text-muted-foreground mt-1">
+      <div className="max-w-2xl">
+        <div className="mb-5">
+          <h1 className="text-xl font-bold text-foreground" data-testid="text-discover-heading">Discover & Participate</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Personalised connections, services, events and journey planning — all in one place.
           </p>
         </div>

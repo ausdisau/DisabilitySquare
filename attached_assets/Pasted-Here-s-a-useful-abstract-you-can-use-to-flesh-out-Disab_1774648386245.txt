@@ -1,0 +1,119 @@
+Here’s a useful abstract you can use to **flesh out DisabilitySquare**:
+
+**Abstract — Vincent Labatut, *Google+ Network Extractor* (2011)**
+Labatut’s *Google+ Network Extractor* is an early large-scale social graph harvesting tool built to reconstruct the public follower/followee network of Google+ before a fully documented official API existed. The software scanned public Google IDs, stored users and relationships in an H2 database, then exported the resulting graph as an edgelist for downstream analysis. Labatut reports using it to capture a very large snapshot of Google+, ultimately producing a network with about **80.1 million nodes** and **473.1 million links**, and supporting post-processing in both Java and R for giant-component extraction and graph analysis. The project is significant less for its continued technical usability today than for its demonstration of how a social platform can be modeled as a graph of identities, ties, communities, and interaction pathways. It also shows the practical constraints of network extraction at scale: undocumented APIs, anti-abuse controls, long crawl times, storage tradeoffs, and the need for graph-oriented post-processing rather than relying only on conventional web app data models. ([GitHub][1])
+
+For **DisabilitySquare**, the most valuable takeaway is not “crawl a social graph,” but **design the platform as a social graph from day one**. Your brief already points in that direction: user profiles, groups, forums, blogs, private messaging, service-provider pages, and diagnosis/location/interest-based communities all imply a network of people, organisations, and relationships rather than just a set of pages. The brief also emphasizes a calmer, more accessible “village square” model built on WordPress/BuddyPress with strong accessibility controls, peer support, and community belonging. 
+
+That suggests these practical design moves for the Replit build:
+
+**1. Make relationships first-class objects**
+Do not treat users as isolated profiles. Model:
+
+* user ↔ user: friends, peers, mentors, trusted contacts
+* user ↔ group: member, moderator, founder
+* user ↔ organisation: follows, receives support from, attends events from
+* user ↔ topic: diagnosis, interests, location, advocacy themes
+
+This is the core lesson from Labatut’s extractor: the network structure becomes the product. ([GitHub][1])
+
+**2. Build for community discovery, not infinite scrolling**
+Your brief explicitly rejects bloated mainstream social media in favor of a daily-use local square. That means:
+
+* “Communities near me”
+* “People with similar lived experience”
+* “Local advocacy and service providers”
+* “New conversations in my groups”
+* “Unread private messages”
+* “Today’s community events”
+
+This is stronger for DisabilitySquare than a generic activity feed. 
+
+**3. Use graph-informed recommendations carefully**
+Borrow a safe, accessibility-first version of social graph logic:
+
+* recommend groups based on overlapping interests, location, and diagnosis tags
+* recommend peer connections only with high transparency and opt-in
+* surface relevant organisations by geography and support area
+* avoid engagement-maximizing algorithms that overwhelm users
+
+That keeps the network useful without becoming manipulative.
+
+**4. Separate public community data from private support data**
+Labatut’s project depended on public relational data. DisabilitySquare should do the reverse where needed:
+
+* public: groups, public posts, advocacy pages, public events
+* private: messaging, sensitive profile fields, health/disability preferences, moderation flags
+
+This is especially important because your users may disclose vulnerable personal information.
+
+**5. Measure “belonging” with network health metrics**
+A modern DisabilitySquare analytics layer could track:
+
+* active groups by region/topic
+* number of meaningful replies per user
+* newcomer retention after 7/30 days
+* ratio of posters to responders
+* isolated users who have not received replies
+* bridge organisations connecting users to services
+
+That is the most constructive reuse of Labatut’s network-analysis mindset.
+
+**6. Design accessibility into the interaction graph**
+Your brief already calls for strong accessibility controls, high-contrast modes, font-size changes, low-JavaScript patterns, ALT/TITLE usage, and keyboard access. Keep those as platform-wide requirements, not theme extras. 
+For the social layer, add:
+
+* screen-reader-friendly notifications
+* keyboard-accessible chat and forums
+* plain-language summaries for group descriptions
+* optional low-stimulation mode
+* content pacing controls instead of endless feed refresh
+* easy privacy controls per profile field and per post
+
+**7. Replit MVP structure**
+Since I could not access the Replit project directly without a login, I’d frame the MVP like this:
+
+* **Home**
+
+  * welcome
+  * local/community updates
+  * featured groups
+  * accessibility controls
+* **Profiles**
+
+  * bio, location, interests, support needs, privacy settings
+* **Groups**
+
+  * diagnosis-based
+  * location-based
+  * interest-based
+* **Forums**
+
+  * threaded support discussions
+* **Messages / Chat**
+
+  * private, accessible, lightweight
+* **Organisation Pages**
+
+  * advocacy groups and service providers
+* **Blogs / Stories**
+
+  * personal writing and community articles
+* **Games / Social activities**
+
+  * simple accessible browser games from your brief
+* **Moderation / Safety**
+
+  * report tools, community guidelines, crisis links
+
+**A sharper one-paragraph project framing**
+You could describe DisabilitySquare like this:
+
+> DisabilitySquare is an accessible, community-first social network for people with disabilities, designed as a digital village square rather than a high-noise social media feed. Inspired by social graph thinking, the platform centers on relationships between people, peer-support groups, advocacy organisations, service providers, and local communities. Core features include profiles, groups, forums, blogs, private messaging, chat, and accessible discovery tools that help users find relevant people, support, and services by diagnosis, location, and shared interests, all within a calmer and more inclusive experience.  ([GitHub][1])
+
+I couldn’t open the linked Replit workspace because it redirects to a login page, so I based this on your uploaded project brief and the archived software record. ([replit][2])
+
+I can turn this into a **feature backlog, site map, or database schema** for DisabilitySquare next.
+
+[1]: https://github.com/CompNet/GooglePlusParser "GitHub - CompNet/GooglePlusParser: Java program allowing to retrieve the G+ network"
+[2]: https://replit.com/t/australian-disability-ltd/repls/DisabilitySquare "Sign Up - Replit"
