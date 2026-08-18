@@ -1,0 +1,1 @@
+- [Vercel framework detection](vercel-framework-detection.md) — this Vite/Express app must explicitly disable Next.js detection when deploying to Vercel.

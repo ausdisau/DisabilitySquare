@@ -1,0 +1,50 @@
+21:44:25.932 Running build in Washington, D.C., USA (East) – iad1
+21:44:25.932 Build machine configuration: 4 cores, 8 GB
+21:44:26.035 Cloning github.com/ausdisau/DisabilitySquare (Branch: main, Commit: 95e1a73)
+21:44:26.036 Previous build caches not available.
+21:44:26.527 Cloning completed: 492.000ms
+21:44:26.794 Running "vercel build"
+21:44:26.807 Vercel CLI 58.1.0
+21:44:26.993 Installing dependencies...
+21:44:41.063 
+21:44:41.064 added 668 packages in 14s
+21:44:41.064 
+21:44:41.064 162 packages are looking for funding
+21:44:41.064   run `npm fund` for details
+21:44:41.107 Detected Next.js version: 16.1.4
+21:44:41.112 Running "npm run build"
+21:44:41.203 
+21:44:41.204 > rest-express@1.0.0 build
+21:44:41.204 > tsx script/build.ts
+21:44:41.204 
+21:44:41.798 building client...
+21:44:41.856 vite v7.3.0 building client environment for production...
+21:44:42.381 transforming...
+21:44:42.408 Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+21:44:42.408   npx update-browserslist-db@latest
+21:44:42.408   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+21:44:45.927 ✓ 2215 modules transformed.
+21:44:46.455 rendering chunks...
+21:44:46.471 computing gzip size...
+21:44:46.499 ../dist/public/index.html                     2.01 kB │ gzip:   0.77 kB
+21:44:46.500 ../dist/public/assets/index-UvL3kB_4.css     75.89 kB │ gzip:  12.94 kB
+21:44:46.500 ../dist/public/assets/index-ddGyzE9n.js   1,048.27 kB │ gzip: 292.79 kB
+21:44:46.500 
+21:44:46.500 (!) Some chunks are larger than 500 kB after minification. Consider:
+21:44:46.500 - Using dynamic import() to code-split the application
+21:44:46.500 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+21:44:46.500 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+21:44:46.501 ✓ built in 4.46s
+21:44:46.501 building server...
+21:44:46.663 
+21:44:46.663   dist/index.cjs  1.2mb ⚠️
+21:44:46.663 
+21:44:46.663 ⚡ Done in 145ms
+21:44:46.749 Error: The Next.js output directory ".next" was not found at "/vercel/path0/.next". This is usually caused by one of the following:
+21:44:46.749 
+21:44:46.749 1. The "Output Directory" setting in your project is misconfigured. Check your project settings and ensure the output directory matches your Next.js configuration.
+21:44:46.749 
+21:44:46.749 2. If using Turborepo, ensure your task outputs include the Next.js build directory. Add ".next/**" to the "outputs" array in your turbo.json for the build task.
+21:44:46.750 
+21:44:46.750 3. The build command did not complete successfully. Check the build logs above for errors.
+21:44:46.750 Learn More: https://err.sh/vercel/vercel/now-next-routes-manifest
