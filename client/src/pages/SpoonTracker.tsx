@@ -256,8 +256,8 @@ export default function SpoonTracker() {
                 <span className="text-xs text-muted-foreground">Not recorded</span>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {history.length > 0 && (
           <Card>
